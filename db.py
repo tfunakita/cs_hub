@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     completed_at     DATETIME,
     reminded_2days   INTEGER DEFAULT 0,
     reminded_1day    INTEGER DEFAULT 0,
-    reminded_today   INTEGER DEFAULT 0
+    reminded_today   INTEGER DEFAULT 0,
+    unread_reply     INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS task_threads (
@@ -95,6 +96,11 @@ def init_db():
             conn.execute("ALTER TABLE tasks ADD COLUMN chatwork_room_name TEXT")
         except Exception:
             pass
+        # マイグレーション：unread_replyカラム追加
+        try:
+            conn.execute("ALTER TABLE tasks ADD COLUMN unread_reply INTEGER DEFAULT 0")
+        except Exception:
+            pass
         # 既存タスクのchatwork_message_idをprocessed_messagesに同期（重複防止）
         conn.execute("""
             INSERT OR IGNORE INTO processed_messages (chatwork_message_id)
@@ -143,7 +149,7 @@ def create_task(data: dict) -> int:
 def update_task(task_id: int, data: dict):
     allowed = ["title", "body", "summary", "status", "priority", "assignee",
                "due_date", "reminded_2days", "reminded_1day", "reminded_today",
-               "completed_at"]
+               "completed_at", "unread_reply"]
     updates = {k: v for k, v in data.items() if k in allowed}
     if not updates:
         return
@@ -209,6 +215,9 @@ def add_thread(task_id: int, data: dict) -> int:
             (task_id, data.get("chatwork_message_id"), data.get("sender_name"),
              data.get("sender_account_id"), data.get("body"), data.get("direction", "inbound"))
         )
+        # 受信メッセージなら未読フラグを立てる
+        if data.get("direction", "inbound") == "inbound":
+            conn.execute("UPDATE tasks SET unread_reply = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (task_id,))
         return cur.lastrowid
 
 # ─── Room state ───────────────────────────────────────────────

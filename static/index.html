@@ -92,6 +92,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-ser
 .task-table input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; accent-color: #3b82f6; }
 .task-title { font-weight: 500; color: #1e293b; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .task-body-hint { font-size: 12px; color: #94a3b8; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unread-dot { display: inline-block; width: 8px; height: 8px; background: #10b981; border-radius: 50%; margin-left: 6px; vertical-align: middle; animation: pulse-dot 1.5s infinite; }
+@keyframes pulse-dot { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .6; transform: scale(1.3); } }
 .empty-state { padding: 48px; text-align: center; color: #94a3b8; }
 
 /* Badges */
@@ -303,7 +305,7 @@ function renderAlertCard(label, items, type, icon) {
     : items.slice(0,8).map(t => `
         <div class="alert-row" onclick="openTask(${t.id})">
           <span class="badge ${staffClass(t.assignee)}">${t.assignee || '未担当'}</span>
-          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.summary || t.title)}</span>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.summary || t.title)}${t.unread_reply ? '<span class="unread-dot" title="新着返信あり"></span>' : ''}</span>
           ${t.due_date ? `<span style="font-size:11px;color:#94a3b8">${t.due_date}</span>` : ''}
         </div>`).join('');
   return `
@@ -418,7 +420,7 @@ function renderTaskRow(t) {
     <tr class="${sel?'selected':''}" data-id="${t.id}">
       <td onclick="event.stopPropagation()"><input type="checkbox" ${sel?'checked':''} onclick="toggleSelect(${t.id}, this)"></td>
       <td onclick="openTask(${t.id})">
-        <div class="task-title">${esc(t.summary || t.title)}</div>
+        <div class="task-title">${esc(t.summary || t.title)}${t.unread_reply ? '<span class="unread-dot" title="新着返信あり"></span>' : ''}</div>
         <div class="task-body-hint">
           ${t.sender_name ? `依頼: ${esc(t.sender_name)}` : ''}
           ${t.chatwork_room_name ? ` · 📢 ${esc(t.chatwork_room_name)}` : ''}
@@ -486,10 +488,15 @@ async function openTask(taskId) {
     api.get(`/api/tasks/${taskId}`),
     api.get(`/api/tasks/${taskId}/threads`),
   ]);
+  // スレッド取得でサーバー側のunread_replyがクリアされる
+  task.unread_reply = 0;
   document.getElementById('modal-title').textContent = task.summary || task.title;
   document.getElementById('modal-body').innerHTML = renderTaskModalBody(task, threads);
   document.getElementById('modal-footer').innerHTML = renderTaskModalFooter(task);
   document.getElementById('task-overlay').classList.add('open');
+  // タスク行の緑ランプを即時消す
+  const dot = document.querySelector(`tr[data-id="${taskId}"] .unread-dot`);
+  if (dot) dot.remove();
 }
 
 function renderTaskModalBody(task, threads) {
@@ -555,7 +562,7 @@ function renderTaskModalBody(task, threads) {
       <div class="thread-list" id="thread-list">${threadHtml}</div>
       ${task.chatwork_room_id ? `
         <div class="reply-row" style="margin-top:10px">
-          <textarea id="reply-input" placeholder="返信を入力（Chatworkにも送信）..."></textarea>
+          <textarea id="reply-input" placeholder="返信を入力（Chatworkにも送信）… Cmd+Enterで送信" onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter'){event.preventDefault();sendReply(${task.id});}"></textarea>
           <button class="btn btn-primary" onclick="sendReply(${task.id})">送信</button>
         </div>` : ''}
     </div>`;
