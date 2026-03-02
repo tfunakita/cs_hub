@@ -1,0 +1,9 @@
+venv/
+.env
+*.db
+*.db-shm
+*.db-wal
+ngrok
+cloudflared
+__pycache__/
+*.pyc

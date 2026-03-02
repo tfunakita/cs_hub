@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CS_HUBくん</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif; font-size: 14px; background: #f1f5f9; color: #1e293b; }
+
+/* Header */
+.header { background: #1e293b; color: #fff; height: 52px; display: flex; align-items: center; padding: 0 20px; gap: 16px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+.header h1 { font-size: 16px; font-weight: 700; letter-spacing: .5px; flex: 1; }
+.header-btn { background: #334155; border: none; color: #cbd5e1; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 5px; }
+.header-btn:hover { background: #475569; color: #fff; }
+.header-btn.active { background: #3b82f6; color: #fff; }
+
+/* Nav */
+.nav { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 0 20px; display: flex; gap: 4px; }
+.nav-item { padding: 12px 16px; cursor: pointer; font-size: 14px; border-bottom: 3px solid transparent; color: #64748b; font-weight: 500; }
+.nav-item:hover { color: #1e293b; }
+.nav-item.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+
+/* Main */
+.main { padding: 20px; max-width: 1400px; margin: 0 auto; }
+
+/* KPI Cards */
+.kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
+.kpi-card { background: #fff; border-radius: 10px; padding: 16px 20px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.kpi-label { font-size: 12px; color: #94a3b8; font-weight: 500; margin-bottom: 4px; }
+.kpi-value { font-size: 28px; font-weight: 700; color: #1e293b; }
+.kpi-value.blue { color: #3b82f6; }
+.kpi-value.green { color: #10b981; }
+
+/* Alert Cards */
+.alert-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+.alert-card { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.06); overflow: hidden; }
+.alert-header { padding: 12px 16px; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; }
+.alert-header .count { margin-left: auto; font-size: 20px; font-weight: 700; }
+.alert-header.red   { background: #fef2f2; color: #dc2626; }
+.alert-header.amber { background: #fffbeb; color: #d97706; }
+.alert-header.slate { background: #f8fafc; color: #475569; }
+.alert-list { padding: 8px 0; max-height: 180px; overflow-y: auto; }
+.alert-row { padding: 7px 16px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 8px; }
+.alert-row:last-child { border-bottom: none; }
+.alert-row:hover { background: #f8fafc; }
+.alert-empty { padding: 16px; text-align: center; color: #94a3b8; font-size: 13px; }
+
+/* Staff table */
+.section-title { font-size: 14px; font-weight: 600; color: #475569; margin-bottom: 10px; }
+.staff-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.staff-table th { background: #f8fafc; padding: 10px 16px; text-align: left; font-size: 12px; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0; }
+.staff-table td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+.staff-table tr:last-child td { border-bottom: none; }
+
+/* Task tabs */
+.task-tabs { background: #fff; border-radius: 10px 10px 0 0; border-bottom: 1px solid #e2e8f0; padding: 0 16px; display: flex; gap: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.tab-item { padding: 12px 14px; cursor: pointer; font-size: 13px; font-weight: 500; color: #64748b; border-bottom: 3px solid transparent; white-space: nowrap; }
+.tab-item:hover { color: #1e293b; }
+.tab-item.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+.tab-badge { display: inline-flex; align-items: center; justify-content: center; background: #e2e8f0; color: #475569; border-radius: 10px; font-size: 11px; min-width: 20px; height: 18px; padding: 0 5px; margin-left: 5px; }
+.tab-badge.blue { background: #dbeafe; color: #1d4ed8; }
+
+/* Toolbar */
+.toolbar { background: #fff; padding: 10px 16px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #e2e8f0; }
+.search-input { border: 1px solid #e2e8f0; border-radius: 7px; padding: 7px 12px; font-size: 13px; width: 220px; outline: none; }
+.search-input:focus { border-color: #3b82f6; }
+.filter-select { border: 1px solid #e2e8f0; border-radius: 7px; padding: 7px 10px; font-size: 13px; outline: none; cursor: pointer; background: #fff; }
+.filter-select:focus { border-color: #3b82f6; }
+.ml-auto { margin-left: auto; }
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 14px; border-radius: 7px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; }
+.btn-primary { background: #3b82f6; color: #fff; }
+.btn-primary:hover { background: #2563eb; }
+.btn-danger  { background: #fee2e2; color: #dc2626; }
+.btn-danger:hover { background: #fecaca; }
+.btn-slate   { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+.btn-slate:hover { background: #e2e8f0; }
+
+/* Bulk bar */
+.bulk-bar { background: #1e293b; color: #fff; padding: 10px 16px; display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.bulk-bar select { background: #334155; border: none; color: #fff; padding: 5px 8px; border-radius: 5px; font-size: 12px; cursor: pointer; }
+.bulk-bar .btn { padding: 5px 12px; font-size: 12px; }
+
+/* Task table */
+.task-wrap { background: #fff; border-radius: 0 0 10px 10px; box-shadow: 0 1px 3px rgba(0,0,0,.06); overflow: hidden; }
+.task-table { width: 100%; border-collapse: collapse; }
+.task-table th { background: #f8fafc; padding: 9px 12px; text-align: left; font-size: 12px; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+.task-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.task-table tr:last-child td { border-bottom: none; }
+.task-table tr:hover td { background: #f8fafc; cursor: pointer; }
+.task-table tr.selected td { background: #eff6ff; }
+.task-table input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; accent-color: #3b82f6; }
+.task-title { font-weight: 500; color: #1e293b; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-body-hint { font-size: 12px; color: #94a3b8; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.empty-state { padding: 48px; text-align: center; color: #94a3b8; }
+
+/* Badges */
+.badge { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.badge-kaneko { background: #dbeafe; color: #1d4ed8; }
+.badge-wada   { background: #d1fae5; color: #065f46; }
+.badge-fukue  { background: #fef3c7; color: #92400e; }
+.badge-none   { background: #f1f5f9; color: #64748b; }
+.badge-urgent { background: #fee2e2; color: #dc2626; }
+.badge-high   { background: #fef3c7; color: #d97706; }
+.badge-normal { background: #eff6ff; color: #3b82f6; }
+.badge-low    { background: #f8fafc; color: #94a3b8; }
+.badge-open       { background: #f1f5f9; color: #475569; }
+.badge-in_progress{ background: #dbeafe; color: #1d4ed8; }
+.badge-done       { background: #d1fae5; color: #065f46; }
+.badge-closed     { background: #f1f5f9; color: #94a3b8; }
+
+/* Modal */
+.overlay { position: fixed; inset: 0; background: rgba(15,23,42,.5); z-index: 200; display: none; align-items: center; justify-content: center; }
+.overlay.open { display: flex; }
+.modal { background: #fff; border-radius: 14px; width: 720px; max-width: 95vw; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+.modal-header { padding: 18px 22px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: flex-start; gap: 12px; }
+.modal-header h2 { font-size: 16px; font-weight: 700; flex: 1; line-height: 1.4; }
+.modal-close { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 20px; padding: 2px 6px; border-radius: 5px; }
+.modal-close:hover { background: #f1f5f9; color: #1e293b; }
+.modal-body { padding: 20px 22px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 16px; }
+.modal-footer { padding: 14px 22px; border-top: 1px solid #e2e8f0; display: flex; align-items: center; gap: 8px; }
+
+/* Form fields */
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; }
+.field label { font-size: 12px; font-weight: 600; color: #64748b; }
+.field input, .field select, .field textarea { border: 1px solid #e2e8f0; border-radius: 7px; padding: 8px 10px; font-size: 13px; outline: none; font-family: inherit; }
+.field input:focus, .field select:focus, .field textarea:focus { border-color: #3b82f6; }
+.field textarea { resize: vertical; min-height: 80px; }
+
+/* Thread */
+.thread-section { border-top: 1px solid #e2e8f0; padding-top: 16px; }
+.thread-title { font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 10px; }
+.thread-list { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; padding: 2px; }
+.thread-msg { padding: 10px 12px; border-radius: 8px; font-size: 13px; line-height: 1.5; }
+.thread-msg.inbound  { background: #f8fafc; border-left: 3px solid #cbd5e1; }
+.thread-msg.outbound { background: #eff6ff; border-left: 3px solid #3b82f6; }
+.thread-meta { font-size: 11px; color: #94a3b8; margin-bottom: 4px; display: flex; gap: 8px; }
+.reply-row { display: flex; gap: 8px; align-items: flex-end; }
+.reply-row textarea { flex: 1; border: 1px solid #e2e8f0; border-radius: 7px; padding: 8px 10px; font-size: 13px; resize: none; height: 60px; outline: none; font-family: inherit; }
+.reply-row textarea:focus { border-color: #3b82f6; }
+
+/* Spinner */
+.spin { display: inline-block; width: 16px; height: 16px; border: 2px solid #e2e8f0; border-top-color: #3b82f6; border-radius: 50%; animation: spin .6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Kanban */
+.kanban-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; align-items: start; }
+.kanban-col { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); overflow: hidden; }
+.kanban-col-header { padding: 12px 16px; font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.kanban-col-header .col-count { margin-left: auto; background: rgba(255,255,255,.3); border-radius: 10px; padding: 2px 8px; font-size: 12px; }
+.kanban-col-header.inbox  { background: #334155; color: #fff; }
+.kanban-col-header.kaneko { background: #1d4ed8; color: #fff; }
+.kanban-col-header.wada   { background: #065f46; color: #fff; }
+.kanban-col-header.fukue  { background: #92400e; color: #fff; }
+.kanban-drop-zone { min-height: 120px; padding: 8px; display: flex; flex-direction: column; gap: 6px; transition: background .15s; }
+.kanban-drop-zone.drag-over { background: #eff6ff; }
+.kanban-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; cursor: grab; user-select: none; transition: box-shadow .15s, opacity .15s; }
+.kanban-card:active { cursor: grabbing; }
+.kanban-card.dragging { opacity: .4; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+.kanban-card-title { font-size: 13px; font-weight: 500; color: #1e293b; margin-bottom: 5px; line-height: 1.4; }
+.kanban-card-meta  { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.kanban-card-sender { font-size: 11px; color: #94a3b8; }
+.kanban-empty { padding: 24px 16px; text-align: center; color: #cbd5e1; font-size: 13px; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+  .alert-grid { grid-template-columns: 1fr; }
+  .field-row { grid-template-columns: 1fr 1fr; }
+  .kanban-board { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>💬 CS_HUBくん</h1>
+  <button class="header-btn" id="btn-poll" onclick="manualPoll()">🔄 今すぐ取得</button>
+  <button class="header-btn" onclick="openNewTask()">＋ 新規タスク</button>
+</div>
+
+<div class="nav">
+  <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard', this)">ダッシュボード</div>
+  <div class="nav-item" data-page="tasks" onclick="switchPage('tasks', this)">タスク一覧</div>
+  <div class="nav-item" data-page="assign" onclick="switchPage('assign', this)">📥 振り分け</div>
+  <div class="nav-item" data-page="recurring" onclick="switchPage('recurring', this)">定期タスク</div>
+  <div class="nav-item" data-page="settings" onclick="switchPage('settings', this)">⚙️ 設定</div>
+</div>
+
+<div class="main" id="main-content"></div>
+
+<!-- Task Modal -->
+<div class="overlay" id="task-overlay" onclick="maybeCloseModal(event)">
+  <div class="modal" id="task-modal">
+    <div class="modal-header">
+      <h2 id="modal-title">タスク詳細</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
+<script>
+const STAFF = ['金子', '和田', '福江'];
+const STATUS_LABELS  = { open: '未対応', in_progress: '対応中', done: '完了', closed: 'クローズ' };
+const PRIORITY_LABELS= { low: '低', normal: '中', high: '高', urgent: '緊急' };
+
+let state = {
+  page: 'dashboard',
+  tab: 'all',
+  tasks: [],
+  selected: new Set(),
+  filters: { status: '', priority: '', search: '' },
+  dashData: null,
+  editingId: null,
+};
+
+// ─── API ───────────────────────────────────────────────────
+const api = {
+  async get(path) {
+    const r = await fetch(path);
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  async post(path, data) {
+    const r = await fetch(path, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  async put(path, data) {
+    const r = await fetch(path, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  async del(path) {
+    const r = await fetch(path, { method: 'DELETE' });
+    if (!r.ok && r.status !== 204) throw new Error(await r.text());
+  },
+};
+
+// ─── Navigation ────────────────────────────────────────────
+function switchPage(page, el) {
+  state.page = page;
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+  render();
+}
+
+// ─── Render dispatcher ─────────────────────────────────────
+async function render() {
+  if (state.page === 'dashboard') await renderDashboard();
+  else if (state.page === 'tasks')     await renderTasks();
+  else if (state.page === 'assign')    await renderAssign();
+  else if (state.page === 'recurring') await renderRecurring();
+  else if (state.page === 'settings')  await renderSettings();
+}
+
+// ─── Dashboard ─────────────────────────────────────────────
+async function renderDashboard() {
+  const el = document.getElementById('main-content');
+  el.innerHTML = '<div style="padding:40px;text-align:center"><div class="spin"></div></div>';
+  try {
+    const d = await api.get('/api/dashboard');
+    state.dashData = d;
+    const k = d.kpi;
+    el.innerHTML = `
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">受信タスク</div><div class="kpi-value blue">${k.inbound}</div></div>
+        <div class="kpi-card"><div class="kpi-label">手動起票</div><div class="kpi-value">${k.outbound}</div></div>
+        <div class="kpi-card"><div class="kpi-label">合計タスク</div><div class="kpi-value">${k.total}</div></div>
+        <div class="kpi-card"><div class="kpi-label">完了済み</div><div class="kpi-value green">${k.done}</div></div>
+        <div class="kpi-card"><div class="kpi-label">完了率</div><div class="kpi-value">${k.completion_rate}%</div></div>
+      </div>
+      <div class="alert-grid">
+        ${renderAlertCard('未担当タスク', d.alerts.unassigned, 'slate', '👤')}
+        ${renderAlertCard('期限超過', d.alerts.overdue, 'red', '🚨')}
+        ${renderAlertCard('2時間以上未返信', d.alerts.no_reply, 'amber', '💬')}
+      </div>
+      <div class="section-title">担当者別パフォーマンス</div>
+      <table class="staff-table">
+        <thead><tr>
+          <th>担当者</th><th>保有タスク</th><th>今月完了</th><th>平均対応日数</th>
+        </tr></thead>
+        <tbody>${d.staff.map(s => `
+          <tr>
+            <td><span class="badge ${staffClass(s.name)}">${s.name}</span></td>
+            <td>${s.holding}</td>
+            <td>${s.done_month}</td>
+            <td>${s.avg_days != null ? s.avg_days + '日' : '—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch(e) {
+    el.innerHTML = `<div style="padding:20px;color:#dc2626">読み込みエラー: ${e.message}</div>`;
+  }
+}
+
+function renderAlertCard(label, items, type, icon) {
+  const rows = items.length === 0
+    ? `<div class="alert-empty">問題なし ✓</div>`
+    : items.slice(0,8).map(t => `
+        <div class="alert-row" onclick="openTask(${t.id})">
+          <span class="badge ${staffClass(t.assignee)}">${t.assignee || '未担当'}</span>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.summary || t.title)}</span>
+          ${t.due_date ? `<span style="font-size:11px;color:#94a3b8">${t.due_date}</span>` : ''}
+        </div>`).join('');
+  return `
+    <div class="alert-card">
+      <div class="alert-header ${type}">
+        <span>${icon} ${label}</span>
+        <span class="count">${items.length}</span>
+      </div>
+      <div class="alert-list">${rows}</div>
+    </div>`;
+}
+
+// ─── Task List ─────────────────────────────────────────────
+async function renderTasks() {
+  const el = document.getElementById('main-content');
+  const params = new URLSearchParams();
+  const isDoneTab = state.tab === '完了';
+
+  if (!isDoneTab) {
+    if (state.tab !== 'all' && state.tab !== '未担当') params.set('assignee', state.tab);
+    if (state.tab === '未担当') params.set('assignee', '未担当');
+    if (state.filters.status)   params.set('status',   state.filters.status);
+  }
+  if (state.filters.priority) params.set('priority', state.filters.priority);
+  if (state.filters.search)   params.set('search',   state.filters.search);
+
+  try {
+    let tasks = await api.get('/api/tasks?' + params);
+    if (isDoneTab) {
+      state.tasks = tasks.filter(t => ['done','closed'].includes(t.status));
+    } else if (!state.filters.status) {
+      state.tasks = tasks.filter(t => !['done','closed'].includes(t.status));
+    } else {
+      state.tasks = tasks;
+    }
+  } catch(e) { state.tasks = []; }
+
+  const counts = await getTabCounts();
+
+  const tabs = ['all', ...STAFF, '未担当', '完了'];
+  const tabsHtml = tabs.map(t => {
+    const label = t === 'all' ? 'すべて' : t === '完了' ? '✅ 完了' : t;
+    const cnt   = counts[t] || 0;
+    const isActive = state.tab === t;
+    return `<div class="tab-item ${isActive?'active':''}" onclick="switchTab('${t}')">${label}<span class="tab-badge ${isActive?'blue':''}">${cnt}</span></div>`;
+  }).join('');
+
+  const bulkBar = state.selected.size > 0 ? renderBulkBar() : '';
+
+  const rows = state.tasks.length === 0
+    ? `<tr><td colspan="8"><div class="empty-state">タスクがありません</div></td></tr>`
+    : state.tasks.map(t => renderTaskRow(t)).join('');
+
+  el.innerHTML = `
+    <div class="task-tabs">${tabsHtml}</div>
+    <div class="toolbar">
+      <input class="search-input" type="text" placeholder="🔍 タスクを検索..." value="${esc(state.filters.search)}" oninput="debounceSearch(this.value)">
+      <select class="filter-select" onchange="setFilter('status', this.value)">
+        <option value="">すべてのステータス</option>
+        <option value="open" ${state.filters.status==='open'?'selected':''}>未対応</option>
+        <option value="in_progress" ${state.filters.status==='in_progress'?'selected':''}>対応中</option>
+        <option value="done" ${state.filters.status==='done'?'selected':''}>完了</option>
+        <option value="closed" ${state.filters.status==='closed'?'selected':''}>クローズ</option>
+      </select>
+      <select class="filter-select" onchange="setFilter('priority', this.value)">
+        <option value="">すべての優先度</option>
+        <option value="urgent" ${state.filters.priority==='urgent'?'selected':''}>緊急</option>
+        <option value="high"   ${state.filters.priority==='high'?'selected':''}>高</option>
+        <option value="normal" ${state.filters.priority==='normal'?'selected':''}>中</option>
+        <option value="low"    ${state.filters.priority==='low'?'selected':''}>低</option>
+      </select>
+      <button class="btn btn-primary ml-auto" onclick="openNewTask()">＋ 新規タスク</button>
+    </div>
+    ${bulkBar}
+    <div class="task-wrap">
+      <table class="task-table">
+        <thead><tr>
+          <th><input type="checkbox" id="chk-all" onclick="toggleAllSelect(this)"></th>
+          <th>タスク</th>
+          <th>担当者</th>
+          <th>優先度</th>
+          <th>期限</th>
+          <th>ステータス</th>
+          <th>作成日</th>
+          <th></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+async function getTabCounts() {
+  const counts = { all: 0, '未担当': 0, '完了': 0 };
+  STAFF.forEach(s => counts[s] = 0);
+  try {
+    const all = await api.get('/api/tasks');
+    all.forEach(t => {
+      const done = ['done','closed'].includes(t.status);
+      if (done) { counts['完了']++; return; }
+      counts.all++;
+      if (!t.assignee) counts['未担当']++;
+      else if (counts[t.assignee] !== undefined) counts[t.assignee]++;
+    });
+  } catch(e) {}
+  return counts;
+}
+
+function renderTaskRow(t) {
+  const sel = state.selected.has(t.id);
+  const due = t.due_date ? dueDateDisplay(t.due_date) : '<span style="color:#cbd5e1">—</span>';
+  return `
+    <tr class="${sel?'selected':''}" data-id="${t.id}">
+      <td onclick="event.stopPropagation()"><input type="checkbox" ${sel?'checked':''} onclick="toggleSelect(${t.id}, this)"></td>
+      <td onclick="openTask(${t.id})">
+        <div class="task-title">${esc(t.summary || t.title)}</div>
+        <div class="task-body-hint">
+          ${t.sender_name ? `依頼: ${esc(t.sender_name)}` : ''}
+          ${t.chatwork_room_name ? ` · 📢 ${esc(t.chatwork_room_name)}` : ''}
+        </div>
+      </td>
+      <td onclick="openTask(${t.id})"><span class="badge ${staffClass(t.assignee)}">${t.assignee || '未担当'}</span></td>
+      <td onclick="openTask(${t.id})"><span class="badge badge-${t.priority}">${PRIORITY_LABELS[t.priority]||t.priority}</span></td>
+      <td onclick="openTask(${t.id})">${due}</td>
+      <td onclick="openTask(${t.id})"><span class="badge badge-${t.status}">${STATUS_LABELS[t.status]||t.status}</span></td>
+      <td onclick="openTask(${t.id})" style="color:#94a3b8;font-size:12px">${fmtDate(t.created_at)}</td>
+      <td onclick="event.stopPropagation()" style="white-space:nowrap">
+        ${!['done','closed'].includes(t.status)
+          ? `<button class="btn" style="padding:4px 8px;font-size:11px;background:#d1fae5;color:#065f46" onclick="completeTask(${t.id})">✅</button> `
+          : ''}
+        <button class="btn btn-danger" style="padding:4px 8px;font-size:11px" onclick="deleteTask(${t.id})">削除</button>
+      </td>
+    </tr>`;
+}
+
+function dueDateDisplay(due) {
+  const d   = new Date(due);
+  const now = new Date(); now.setHours(0,0,0,0);
+  const diff= Math.round((d - now) / 86400000);
+  const fmt = `${d.getMonth()+1}/${d.getDate()}`;
+  if (diff < 0)  return `<span style="color:#dc2626;font-weight:600">${fmt} (${-diff}日超過)</span>`;
+  if (diff === 0)return `<span style="color:#d97706;font-weight:600">${fmt} (今日)</span>`;
+  if (diff <= 2) return `<span style="color:#d97706">${fmt} (あと${diff}日)</span>`;
+  return fmt;
+}
+
+function renderBulkBar() {
+  return `
+    <div class="bulk-bar">
+      <span>${state.selected.size}件選択中</span>
+      <select id="bulk-assignee" style="margin-left:8px">
+        <option value="">担当者を変更</option>
+        ${STAFF.map(s => `<option value="${s}">${s}</option>`).join('')}
+      </select>
+      <select id="bulk-priority">
+        <option value="">優先度を変更</option>
+        <option value="urgent">緊急</option>
+        <option value="high">高</option>
+        <option value="normal">中</option>
+        <option value="low">低</option>
+      </select>
+      <select id="bulk-status">
+        <option value="">ステータスを変更</option>
+        <option value="open">未対応</option>
+        <option value="in_progress">対応中</option>
+        <option value="done">完了</option>
+        <option value="closed">クローズ</option>
+      </select>
+      <input type="date" id="bulk-due" style="background:#334155;border:none;color:#fff;padding:5px 8px;border-radius:5px;font-size:12px" title="期限を変更">
+      <button class="btn btn-primary" style="margin-left:4px" onclick="applyBulk()">適用</button>
+      <button class="btn btn-slate" onclick="clearSelection()">解除</button>
+    </div>`;
+}
+
+// ─── Task Modal ────────────────────────────────────────────
+async function openTask(taskId) {
+  state.editingId = taskId;
+  const [task, threads] = await Promise.all([
+    api.get(`/api/tasks/${taskId}`),
+    api.get(`/api/tasks/${taskId}/threads`),
+  ]);
+  document.getElementById('modal-title').textContent = task.summary || task.title;
+  document.getElementById('modal-body').innerHTML = renderTaskModalBody(task, threads);
+  document.getElementById('modal-footer').innerHTML = renderTaskModalFooter(task);
+  document.getElementById('task-overlay').classList.add('open');
+}
+
+function renderTaskModalBody(task, threads) {
+  const threadHtml = threads.length === 0
+    ? '<div style="color:#94a3b8;font-size:13px;padding:8px 0">スレッドなし</div>'
+    : threads.map(m => `
+        <div class="thread-msg ${m.direction}">
+          <div class="thread-meta">
+            <span>${esc(m.sender_name || (m.direction==='outbound'?'CS_HUBくん':'不明'))}</span>
+            <span>${fmtDatetime(m.sent_at)}</span>
+          </div>
+          <div>${esc(m.body)}</div>
+        </div>`).join('');
+
+  return `
+    ${task.chatwork_room_name ? `
+    <div style="background:#eff6ff;border-radius:8px;padding:9px 14px;font-size:13px;display:flex;align-items:center;gap:8px">
+      <span style="color:#64748b">📢 グループ</span>
+      <span style="font-weight:600;color:#1e293b;flex:1">${esc(task.chatwork_room_name)}</span>
+      ${task.chatwork_message_id ? `<a href="https://www.chatwork.com/#!rid${task.chatwork_room_id}-${task.chatwork_message_id}" target="_blank" style="font-size:12px;color:#3b82f6;text-decoration:none;white-space:nowrap">メッセージを開く ↗</a>` : ''}
+    </div>` : ''}
+    <div class="field-row">
+      <div class="field">
+        <label>担当者</label>
+        <select id="f-assignee" onchange="quickUpdate(${task.id}, 'assignee', this.value)">
+          <option value="">未担当</option>
+          ${STAFF.map(s => `<option value="${s}" ${task.assignee===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label>優先度</label>
+        <select id="f-priority" onchange="quickUpdate(${task.id}, 'priority', this.value)">
+          <option value="low"    ${task.priority==='low'?'selected':''}>低</option>
+          <option value="normal" ${task.priority==='normal'?'selected':''}>中</option>
+          <option value="high"   ${task.priority==='high'?'selected':''}>高</option>
+          <option value="urgent" ${task.priority==='urgent'?'selected':''}>緊急</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>期限</label>
+        <input type="date" id="f-due" value="${task.due_date||''}" onchange="quickUpdate(${task.id}, 'due_date', this.value)">
+      </div>
+      <div class="field">
+        <label>ステータス</label>
+        <select id="f-status" onchange="quickUpdate(${task.id}, 'status', this.value)">
+          <option value="open"        ${task.status==='open'?'selected':''}>未対応</option>
+          <option value="in_progress" ${task.status==='in_progress'?'selected':''}>対応中</option>
+          <option value="done"        ${task.status==='done'?'selected':''}>完了</option>
+          <option value="closed"      ${task.status==='closed'?'selected':''}>クローズ</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>タイトル</label>
+      <input type="text" id="f-title" value="${esc(task.title)}" onchange="quickUpdate(${task.id}, 'title', this.value)">
+    </div>
+    <div class="field">
+      <label>内容</label>
+      <textarea id="f-body" rows="4" onchange="quickUpdate(${task.id}, 'body', this.value)">${esc(task.body||'')}</textarea>
+    </div>
+    <div class="thread-section">
+      <div class="thread-title">💬 スレッド（${threads.length}件）</div>
+      <div class="thread-list" id="thread-list">${threadHtml}</div>
+      ${task.chatwork_room_id ? `
+        <div class="reply-row" style="margin-top:10px">
+          <textarea id="reply-input" placeholder="返信を入力（Chatworkにも送信）..."></textarea>
+          <button class="btn btn-primary" onclick="sendReply(${task.id})">送信</button>
+        </div>` : ''}
+    </div>`;
+}
+
+function renderTaskModalFooter(task) {
+  const isDone = ['done','closed'].includes(task.status);
+  const cwLink = task.chatwork_room_id && task.chatwork_message_id
+    ? `<a href="https://www.chatwork.com/#!rid${task.chatwork_room_id}-${task.chatwork_message_id}"
+         target="_blank"
+         style="font-size:12px;color:#3b82f6;text-decoration:none;display:flex;align-items:center;gap:4px">
+         💬 ${esc(task.chatwork_room_name || 'Chatworkで開く')} ↗
+       </a>`
+    : '';
+  return `
+    <span style="font-size:12px;color:#94a3b8">作成: ${fmtDatetime(task.created_at)}</span>
+    ${task.sender_name ? `<span style="font-size:12px;color:#94a3b8">依頼者: ${esc(task.sender_name)}</span>` : ''}
+    ${cwLink}
+    <div class="ml-auto" style="display:flex;gap:8px">
+      <button class="btn btn-danger" onclick="deleteTask(${task.id}, true)">削除</button>
+      ${isDone
+        ? `<button class="btn btn-slate" onclick="quickUpdate(${task.id},'status','open');closeModal();render()">再オープン</button>`
+        : `<button class="btn btn-primary" style="background:#10b981" onclick="completeTask(${task.id})">✅ 完了</button>`
+      }
+      <button class="btn btn-slate" onclick="closeModal()">閉じる</button>
+    </div>`;
+}
+
+function openNewTask() {
+  state.editingId = null;
+  document.getElementById('modal-title').textContent = '新規タスク';
+  document.getElementById('modal-body').innerHTML = `
+    <div class="field">
+      <label>タイトル <span style="color:#dc2626">*</span></label>
+      <input type="text" id="f-title" placeholder="タスクのタイトル">
+    </div>
+    <div class="field">
+      <label>内容</label>
+      <textarea id="f-body" rows="4" placeholder="詳細を入力..."></textarea>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>担当者</label>
+        <select id="f-assignee">
+          <option value="">未担当</option>
+          ${STAFF.map(s => `<option value="${s}">${s}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label>優先度</label>
+        <select id="f-priority">
+          <option value="low">低</option>
+          <option value="normal" selected>中</option>
+          <option value="high">高</option>
+          <option value="urgent">緊急</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>期限</label>
+        <input type="date" id="f-due">
+      </div>
+      <div class="field">
+        <label>ステータス</label>
+        <select id="f-status">
+          <option value="open">未対応</option>
+          <option value="in_progress">対応中</option>
+        </select>
+      </div>
+    </div>`;
+  document.getElementById('modal-footer').innerHTML = `
+    <div class="ml-auto" style="display:flex;gap:8px">
+      <button class="btn btn-slate" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveNewTask()">作成</button>
+    </div>`;
+  document.getElementById('task-overlay').classList.add('open');
+}
+
+async function saveNewTask() {
+  const title = document.getElementById('f-title').value.trim();
+  if (!title) { alert('タイトルを入力してください'); return; }
+  const data = {
+    title,
+    body:      document.getElementById('f-body').value.trim() || null,
+    assignee:  document.getElementById('f-assignee').value || null,
+    priority:  document.getElementById('f-priority').value,
+    status:    document.getElementById('f-status').value,
+    due_date:  document.getElementById('f-due').value || null,
+  };
+  try {
+    await api.post('/api/tasks', data);
+    closeModal();
+    if (state.page === 'tasks') await renderTasks();
+    else await renderDashboard();
+  } catch(e) { alert('作成失敗: ' + e.message); }
+}
+
+async function quickUpdate(taskId, field, value) {
+  try {
+    await api.put(`/api/tasks/${taskId}`, { [field]: value || null });
+    if (state.page === 'tasks') {
+      state.tasks = state.tasks.map(t => t.id === taskId ? { ...t, [field]: value } : t);
+    }
+  } catch(e) { console.error(e); }
+}
+
+async function sendReply(taskId) {
+  const body = document.getElementById('reply-input').value.trim();
+  if (!body) return;
+  try {
+    await api.post(`/api/tasks/${taskId}/reply`, { body });
+    const threads = await api.get(`/api/tasks/${taskId}/threads`);
+    const html = threads.map(m => `
+      <div class="thread-msg ${m.direction}">
+        <div class="thread-meta">
+          <span>${esc(m.sender_name || (m.direction==='outbound'?'CS_HUBくん':'不明'))}</span>
+          <span>${fmtDatetime(m.sent_at)}</span>
+        </div>
+        <div>${esc(m.body)}</div>
+      </div>`).join('');
+    document.getElementById('thread-list').innerHTML = html;
+    document.getElementById('reply-input').value = '';
+    const tl = document.getElementById('thread-list');
+    tl.scrollTop = tl.scrollHeight;
+  } catch(e) { alert('送信失敗: ' + e.message); }
+}
+
+async function completeTask(taskId) {
+  try {
+    await api.put(`/api/tasks/${taskId}`, { status: 'done' });
+    closeModal();
+    await render();
+  } catch(e) { alert('更新失敗: ' + e.message); }
+}
+
+async function deleteTask(taskId, fromModal = false) {
+  if (!confirm('このタスクを削除しますか？')) return;
+  try {
+    await api.del(`/api/tasks/${taskId}`);
+    if (fromModal) closeModal();
+    if (state.page === 'tasks') await renderTasks();
+    else await renderDashboard();
+  } catch(e) { alert('削除失敗: ' + e.message); }
+}
+
+// ─── Assign (Kanban) ───────────────────────────────────────
+let dragTaskId = null;
+
+async function renderAssign() {
+  const el = document.getElementById('main-content');
+  const all = await api.get('/api/tasks?status=open&status=in_progress').catch(() => []);
+  // 全タスク（完了以外）取得
+  const tasks = await api.get('/api/tasks').catch(() => []);
+  const active = tasks.filter(t => !['done','closed'].includes(t.status));
+
+  const cols = [
+    { key: 'inbox',  label: '📥 受信ボックス', cls: 'inbox',  items: active.filter(t => !t.assignee) },
+    { key: '金子',   label: '金子',            cls: 'kaneko', items: active.filter(t => t.assignee === '金子') },
+    { key: '和田',   label: '和田',            cls: 'wada',   items: active.filter(t => t.assignee === '和田') },
+    { key: '福江',   label: '福江',            cls: 'fukue',  items: active.filter(t => t.assignee === '福江') },
+  ];
+
+  const colsHtml = cols.map(col => `
+    <div class="kanban-col">
+      <div class="kanban-col-header ${col.cls}">
+        <span>${col.label}</span>
+        <span class="col-count">${col.items.length}</span>
+      </div>
+      <div class="kanban-drop-zone"
+        data-col="${col.key}"
+        ondragover="onDragOver(event)"
+        ondragleave="onDragLeave(event)"
+        ondrop="onDrop(event, '${col.key}')">
+        ${col.items.length === 0
+          ? '<div class="kanban-empty">タスクなし</div>'
+          : col.items.map(t => renderKanbanCard(t)).join('')
+        }
+      </div>
+    </div>`).join('');
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;margin-bottom:14px">
+      <div style="font-size:14px;font-weight:600;color:#475569">ドラッグ＆ドロップで担当者に振り分け</div>
+      <button class="btn btn-slate ml-auto" onclick="renderAssign()" style="font-size:12px">🔄 更新</button>
+    </div>
+    <div class="kanban-board">${colsHtml}</div>`;
+}
+
+function renderKanbanCard(t) {
+  const due = t.due_date ? `<span class="badge badge-${priorityFromDue(t.due_date)}" style="font-size:10px">${t.due_date}</span>` : '';
+  const pri = `<span class="badge badge-${t.priority}" style="font-size:10px">${PRIORITY_LABELS[t.priority]}</span>`;
+  return `
+    <div class="kanban-card"
+      draggable="true"
+      data-id="${t.id}"
+      ondragstart="onDragStart(event, ${t.id})"
+      ondragend="onDragEnd(event)"
+      onclick="openTask(${t.id})">
+      <div class="kanban-card-title">${esc(t.summary || t.title)}</div>
+      <div class="kanban-card-meta">
+        ${pri}${due}
+        ${t.chatwork_room_name ? `<span class="kanban-card-sender">📢 ${esc(t.chatwork_room_name)}</span>` : ''}
+        ${t.sender_name ? `<span class="kanban-card-sender">依頼: ${esc(t.sender_name)}</span>` : ''}
+      </div>
+    </div>`;
+}
+
+function priorityFromDue(due) {
+  if (!due) return 'low';
+  const diff = Math.round((new Date(due) - new Date()) / 86400000);
+  if (diff < 0)  return 'urgent';
+  if (diff <= 1) return 'high';
+  if (diff <= 3) return 'normal';
+  return 'low';
+}
+
+function onDragStart(e, taskId) {
+  dragTaskId = taskId;
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.classList.add('dragging');
+}
+
+function onDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.kanban-drop-zone').forEach(z => z.classList.remove('drag-over'));
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('drag-over');
+}
+
+function onDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+async function onDrop(e, colKey) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (!dragTaskId) return;
+  const assignee = colKey === 'inbox' ? null : colKey;
+  try {
+    await api.put(`/api/tasks/${dragTaskId}`, { assignee });
+    dragTaskId = null;
+    await renderAssign();
+  } catch(err) {
+    alert('更新失敗: ' + err.message);
+  }
+}
+
+// ─── Settings ──────────────────────────────────────────────
+async function renderSettings() {
+  const el = document.getElementById('main-content');
+  el.innerHTML = '<div style="padding:40px;text-align:center"><div class="spin"></div></div>';
+
+  const [settings, rooms] = await Promise.all([
+    api.get('/api/settings').catch(() => ({ staff: {} })),
+    api.get('/api/chatwork/detected-rooms').catch(() => []),
+  ]);
+
+  const staffNames = ['金子', '和田', '福江'];
+  const groupRooms = rooms.filter(r => r.type === 'group');
+
+  el.innerHTML = `
+    <div style="max-width:720px;display:flex;flex-direction:column;gap:20px">
+
+      <!-- 担当者アカウントID設定 -->
+      <div style="background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden">
+        <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;font-weight:700;font-size:15px">👤 担当者のChatworkアカウントID</div>
+        <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
+          ${staffNames.map(name => {
+            const s = settings.staff[name] || {};
+            const resolved = s.room_id ? `<span style="color:#10b981;font-size:12px">✅ DMルーム解決済 (room: ${s.room_id})</span>` : `<span style="color:#94a3b8;font-size:12px">未解決 — 保存時に自動解決します</span>`;
+            return `
+              <div>
+                <div style="display:grid;grid-template-columns:80px 1fr;align-items:center;gap:12px;margin-bottom:4px">
+                  <label style="font-weight:600;color:#475569">${name}</label>
+                  <input class="search-input" style="width:100%" type="text" id="account-${name}"
+                    placeholder="例: 12345678" value="${esc(s.account_id || '')}">
+                </div>
+                <div style="margin-left:92px">${resolved}</div>
+              </div>`;
+          }).join('')}
+          <div style="font-size:12px;color:#94a3b8;background:#f8fafc;border-radius:8px;padding:10px 12px;line-height:1.7">
+            💡 ChatworkアカウントIDの確認方法：<br>
+            Chatworkにログイン → 右上のアイコン → 「プロフィール」→ URLの数字 または マイページのID
+          </div>
+        </div>
+        <div style="padding:12px 20px;border-top:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;justify-content:flex-end">
+          <span id="save-status" style="font-size:13px;color:#10b981"></span>
+          <button class="btn btn-primary" id="btn-save-settings" onclick="saveSettings()">💾 保存・解決</button>
+        </div>
+      </div>
+
+      <!-- 参加グループルーム一覧 -->
+      <div style="background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden">
+        <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;font-weight:700;font-size:15px">
+          🏠 CS_HUBくんが参加しているグループ
+          <span style="font-size:12px;font-weight:400;color:#94a3b8;margin-left:8px">自動検知 (${groupRooms.length}件) — ポーリング対象</span>
+        </div>
+        <div style="padding:8px 0">
+          ${groupRooms.length === 0
+            ? '<div style="padding:20px;text-align:center;color:#94a3b8">グループが見つかりません</div>'
+            : groupRooms.map(r => `
+                <div style="padding:10px 20px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:10px">
+                  <span style="font-size:18px">💬</span>
+                  <span style="flex:1;font-weight:500">${esc(r.name)}</span>
+                  <span style="font-size:12px;color:#94a3b8">ID: ${r.room_id}</span>
+                </div>`).join('')
+          }
+        </div>
+      </div>
+
+    </div>`;
+}
+
+async function saveSettings() {
+  const staffNames = ['金子', '和田', '福江'];
+  const staff_accounts = {};
+  staffNames.forEach(name => {
+    staff_accounts[name] = document.getElementById(`account-${name}`).value.trim();
+  });
+  const btn = document.getElementById('btn-save-settings');
+  const status = document.getElementById('save-status');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> 解決中...';
+  status.textContent = '';
+  try {
+    const res = await api.put('/api/settings', { staff_accounts });
+    const resolved = res.resolved || {};
+    const msgs = staffNames.map(name => {
+      const r = resolved[name];
+      if (!r || !r.account_id) return null;
+      return r.room_id ? `${name}: ✅` : `${name}: ⚠️ DM未検出`;
+    }).filter(Boolean);
+    status.textContent = msgs.join(' / ');
+    btn.textContent = '💾 保存・解決';
+    btn.disabled = false;
+    await renderSettings();
+  } catch(e) {
+    alert('保存失敗: ' + e.message);
+    btn.textContent = '💾 保存・解決';
+    btn.disabled = false;
+  }
+}
+
+// ─── Recurring ─────────────────────────────────────────────
+async function renderRecurring() {
+  const el = document.getElementById('main-content');
+  const items = await api.get('/api/recurring');
+  const rows = items.length === 0
+    ? `<tr><td colspan="6"><div class="empty-state">定期タスクがありません</div></td></tr>`
+    : items.map(r => `
+        <tr>
+          <td>${esc(r.title)}</td>
+          <td><span class="badge ${staffClass(r.assignee)}">${r.assignee || '未担当'}</span></td>
+          <td>毎月${r.day_of_month}日</td>
+          <td>${r.last_generated || '—'}</td>
+          <td><span class="badge ${r.active ? 'badge-in_progress' : 'badge-closed'}">${r.active ? '有効' : '無効'}</span></td>
+          <td>
+            <button class="btn btn-slate" style="padding:4px 8px;font-size:11px" onclick="toggleRecurring(${r.id}, ${r.active})">${r.active ? '無効化' : '有効化'}</button>
+            <button class="btn btn-danger" style="padding:4px 8px;font-size:11px;margin-left:4px" onclick="deleteRecurring(${r.id})">削除</button>
+          </td>
+        </tr>`).join('');
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;margin-bottom:14px">
+      <div class="section-title" style="margin:0">定期タスク一覧</div>
+      <button class="btn btn-primary ml-auto" onclick="openNewRecurring()">＋ 新規登録</button>
+    </div>
+    <div style="background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+      <table class="staff-table">
+        <thead><tr><th>タイトル</th><th>担当者</th><th>生成日</th><th>最終生成</th><th>状態</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function openNewRecurring() {
+  document.getElementById('modal-title').textContent = '定期タスク登録';
+  document.getElementById('modal-body').innerHTML = `
+    <div class="field"><label>タイトル *</label><input type="text" id="r-title" placeholder="月次〇〇確認"></div>
+    <div class="field"><label>テンプレート本文</label><textarea id="r-template" rows="4" placeholder="詳細テキスト..."></textarea></div>
+    <div class="field-row">
+      <div class="field"><label>担当者</label>
+        <select id="r-assignee">
+          <option value="">未担当</option>
+          ${STAFF.map(s => `<option value="${s}">${s}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label>毎月何日</label><input type="number" id="r-day" value="1" min="1" max="28"></div>
+    </div>`;
+  document.getElementById('modal-footer').innerHTML = `
+    <div class="ml-auto" style="display:flex;gap:8px">
+      <button class="btn btn-slate" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveRecurring()">登録</button>
+    </div>`;
+  document.getElementById('task-overlay').classList.add('open');
+}
+
+async function saveRecurring() {
+  const title = document.getElementById('r-title').value.trim();
+  if (!title) { alert('タイトルを入力してください'); return; }
+  await api.post('/api/recurring', {
+    title,
+    template:     document.getElementById('r-template').value.trim() || null,
+    assignee:     document.getElementById('r-assignee').value || null,
+    day_of_month: parseInt(document.getElementById('r-day').value) || 1,
+  });
+  closeModal();
+  await renderRecurring();
+}
+
+async function toggleRecurring(id, current) {
+  await api.put(`/api/recurring/${id}`, { active: current ? 0 : 1 });
+  await renderRecurring();
+}
+
+async function deleteRecurring(id) {
+  if (!confirm('削除しますか？')) return;
+  await api.del(`/api/recurring/${id}`);
+  await renderRecurring();
+}
+
+// ─── Selection / Bulk ──────────────────────────────────────
+function toggleSelect(id, el) {
+  if (el.checked) state.selected.add(id);
+  else state.selected.delete(id);
+  renderBulkBarInPlace();
+}
+
+function toggleAllSelect(el) {
+  if (el.checked) state.tasks.forEach(t => state.selected.add(t.id));
+  else state.selected.clear();
+  renderTasks();
+}
+
+function clearSelection() {
+  state.selected.clear();
+  renderTasks();
+}
+
+function renderBulkBarInPlace() {
+  const existing = document.querySelector('.bulk-bar');
+  if (state.selected.size > 0) {
+    if (existing) existing.outerHTML = renderBulkBar();
+    else {
+      const toolbar = document.querySelector('.toolbar');
+      if (toolbar) toolbar.insertAdjacentHTML('afterend', renderBulkBar());
+    }
+  } else {
+    if (existing) existing.remove();
+  }
+}
+
+async function applyBulk() {
+  const assignee = document.getElementById('bulk-assignee').value;
+  const priority = document.getElementById('bulk-priority').value;
+  const status   = document.getElementById('bulk-status').value;
+  const due_date = document.getElementById('bulk-due').value;
+  const data = {};
+  if (assignee) data.assignee = assignee;
+  if (priority) data.priority = priority;
+  if (status)   data.status   = status;
+  if (due_date) data.due_date = due_date;
+  if (Object.keys(data).length === 0) return;
+  await api.post('/api/tasks/bulk', { task_ids: [...state.selected], ...data });
+  state.selected.clear();
+  await renderTasks();
+}
+
+// ─── Filters ───────────────────────────────────────────────
+function switchTab(tab) {
+  state.tab = tab;
+  state.selected.clear();
+  renderTasks();
+}
+
+function setFilter(key, value) {
+  state.filters[key] = value;
+  renderTasks();
+}
+
+let searchTimer;
+function debounceSearch(val) {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => { state.filters.search = val; renderTasks(); }, 300);
+}
+
+// ─── Modal utils ───────────────────────────────────────────
+function closeModal() {
+  document.getElementById('task-overlay').classList.remove('open');
+}
+
+function maybeCloseModal(e) {
+  if (e.target === document.getElementById('task-overlay')) closeModal();
+}
+
+// ─── Chatwork ──────────────────────────────────────────────
+async function manualPoll() {
+  const btn = document.getElementById('btn-poll');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> 取得中...';
+  try {
+    await api.post('/api/chatwork/poll', {});
+    if (state.page === 'tasks') await renderTasks();
+    else await renderDashboard();
+  } catch(e) { alert('エラー: ' + e.message); }
+  btn.disabled = false;
+  btn.textContent = '🔄 今すぐ取得';
+}
+
+// ─── Helpers ───────────────────────────────────────────────
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function staffClass(name) {
+  if (name === '金子') return 'badge-kaneko';
+  if (name === '和田')  return 'badge-wada';
+  if (name === '福江') return 'badge-fukue';
+  return 'badge-none';
+}
+
+function fmtDate(s) {
+  if (!s) return '—';
+  const d = new Date(s);
+  return `${d.getMonth()+1}/${d.getDate()}`;
+}
+
+function fmtDatetime(s) {
+  if (!s) return '—';
+  const d = new Date(s);
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+// ─── Init ──────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
