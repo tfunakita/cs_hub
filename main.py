@@ -96,7 +96,7 @@ async def poll_chatwork():
         room_id   = room_info["room_id"]
         room_name = room_info["name"]
         try:
-            messages = await cw_client.get_messages(room_id, force=0)
+            messages = await cw_client.get_messages(room_id, force=1)
             if not messages:
                 continue
 
