@@ -1079,8 +1079,7 @@ async function manualPoll() {
   btn.innerHTML = '<span class="spin"></span> 取得中...';
   try {
     await api.post('/api/chatwork/poll', {});
-    if (state.page === 'tasks') await renderTasks();
-    else await renderDashboard();
+    await render();
   } catch(e) { alert('エラー: ' + e.message); }
   btn.disabled = false;
   btn.textContent = '🔄 今すぐ取得';
