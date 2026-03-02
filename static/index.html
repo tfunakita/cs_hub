@@ -684,7 +684,7 @@ async function completeTask(taskId) {
   try {
     await api.put(`/api/tasks/${taskId}`, { status: 'done' });
     closeModal();
-    await render();
+    switchPage('dashboard', document.querySelector('[data-page="dashboard"]'));
   } catch(e) { alert('更新失敗: ' + e.message); }
 }
 
