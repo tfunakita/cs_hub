@@ -348,7 +348,17 @@ async def reply(task_id: int, body: ReplyCreate):
     msg_id = None
     if cw_client and t.get("chatwork_room_id"):
         try:
-            res = await cw_client.send_message(t["chatwork_room_id"], body.body)
+            # 最新のinboundスレッドを引用（Re:）に使う
+            threads = db.get_threads(task_id)
+            last_inbound = next((th for th in reversed(threads) if th["direction"] == "inbound"), None)
+            message_body = body.body
+            if last_inbound and last_inbound.get("chatwork_message_id") and last_inbound.get("sender_account_id"):
+                rp = f"[rp aid={last_inbound['sender_account_id']} to={t['chatwork_room_id']}-{last_inbound['chatwork_message_id']}]"
+                message_body = f"{rp}\n{body.body}"
+            elif last_inbound and last_inbound.get("chatwork_message_id") and t.get("sender_account_id"):
+                rp = f"[rp aid={t['sender_account_id']} to={t['chatwork_room_id']}-{last_inbound['chatwork_message_id']}]"
+                message_body = f"{rp}\n{body.body}"
+            res = await cw_client.send_message(t["chatwork_room_id"], message_body)
             msg_id = str(res.get("message_id", ""))
         except Exception as e:
             print(f"[reply] send error: {e}")
