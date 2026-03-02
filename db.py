@@ -61,6 +61,11 @@ CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT
 );
+
+CREATE TABLE IF NOT EXISTS processed_messages (
+    chatwork_message_id TEXT PRIMARY KEY,
+    processed_at        DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 def get_conn():
@@ -147,7 +152,22 @@ def update_task(task_id: int, data: dict):
 
 def delete_task(task_id: int):
     with db() as conn:
+        task = conn.execute("SELECT chatwork_message_id FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        if task and task["chatwork_message_id"]:
+            conn.execute(
+                "INSERT OR IGNORE INTO processed_messages (chatwork_message_id) VALUES (?)",
+                (task["chatwork_message_id"],)
+            )
         conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+
+def is_message_processed(message_id: str) -> bool:
+    with db() as conn:
+        r = conn.execute("SELECT 1 FROM processed_messages WHERE chatwork_message_id = ?", (message_id,)).fetchone()
+        return r is not None
+
+def mark_message_processed(message_id: str):
+    with db() as conn:
+        conn.execute("INSERT OR IGNORE INTO processed_messages (chatwork_message_id) VALUES (?)", (message_id,))
 
 def bulk_update_tasks(task_ids: list, data: dict):
     allowed = ["assignee", "priority", "due_date", "status"]

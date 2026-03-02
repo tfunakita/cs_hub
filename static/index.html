@@ -684,7 +684,11 @@ async function completeTask(taskId) {
   try {
     await api.put(`/api/tasks/${taskId}`, { status: 'done' });
     closeModal();
-    switchPage('dashboard', document.querySelector('[data-page="dashboard"]'));
+    if (state.page === 'assign' || state.page === 'tasks') {
+      await render();
+    } else {
+      switchPage('dashboard', document.querySelector('[data-page="dashboard"]'));
+    }
   } catch(e) { alert('更新失敗: ' + e.message); }
 }
 

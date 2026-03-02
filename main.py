@@ -111,10 +111,14 @@ async def poll_chatwork():
                 continue
 
             for m in new_messages:
+                mid = str(m["message_id"])
+                if db.is_message_processed(mid):
+                    continue
                 body = m.get("body", "")
                 if cw.parse_mentions(body, HUB_ACCOUNT_ID):
                     clean = cw.clean_body(body)
                     summary = await generate_summary(clean)
+                    db.mark_message_processed(mid)
                     task_id = db.create_task({
                         "title": summary,
                         "body": clean,
