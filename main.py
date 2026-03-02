@@ -139,18 +139,30 @@ async def poll_chatwork():
                         "direction": "inbound",
                     })
                 else:
-                    # 既存タスクへの返信かチェック
-                    existing = db.get_tasks()
-                    for task in existing:
-                        if task.get("chatwork_room_id") == room_id and task.get("status") not in ("done", "closed"):
-                            db.add_thread(task["id"], {
-                                "chatwork_message_id": str(m["message_id"]),
-                                "sender_name": m.get("account", {}).get("name", ""),
-                                "sender_account_id": str(m.get("account", {}).get("account_id", "")),
-                                "body": m.get("body", ""),
-                                "direction": "inbound",
-                            })
-                            db.update_task(task["id"], {})  # updated_at更新
+                    # [rp] 引用がある場合は参照先メッセージIDでタスクを特定
+                    ref_mid = cw.parse_reply_reference(body)
+                    target_task = db.find_task_by_message_id(ref_mid, room_id) if ref_mid else None
+
+                    # 引用なし or 特定できない場合は同ルームで最後に更新されたオープンタスク
+                    if target_task is None:
+                        room_tasks = [
+                            t for t in db.get_tasks()
+                            if t.get("chatwork_room_id") == room_id
+                            and t.get("status") not in ("done", "closed")
+                        ]
+                        # updated_at降順で最新のタスクに紐付け
+                        room_tasks.sort(key=lambda t: t.get("updated_at", ""), reverse=True)
+                        target_task = room_tasks[0] if room_tasks else None
+
+                    if target_task:
+                        db.add_thread(target_task["id"], {
+                            "chatwork_message_id": str(m["message_id"]),
+                            "sender_name": m.get("account", {}).get("name", ""),
+                            "sender_account_id": str(m.get("account", {}).get("account_id", "")),
+                            "body": body,
+                            "direction": "inbound",
+                        })
+                        db.update_task(target_task["id"], {})
 
             max_id = str(max(int(str(m["message_id"])) for m in new_messages))
             db.set_last_message_id(room_id, max_id)

@@ -171,6 +171,25 @@ def delete_task(task_id: int):
             )
         conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
 
+def find_task_by_message_id(message_id: str, room_id: str) -> dict | None:
+    """引用元メッセージIDからタスクを特定（タスク本体 or スレッド内を検索）"""
+    with db() as conn:
+        # タスク本体のchatwork_message_idと一致
+        r = conn.execute(
+            "SELECT * FROM tasks WHERE chatwork_message_id = ? AND chatwork_room_id = ?",
+            (message_id, room_id)
+        ).fetchone()
+        if r:
+            return dict(r)
+        # スレッド内のメッセージIDと一致するタスクを検索
+        r = conn.execute(
+            "SELECT t.* FROM tasks t "
+            "JOIN task_threads th ON th.task_id = t.id "
+            "WHERE th.chatwork_message_id = ? AND t.chatwork_room_id = ?",
+            (message_id, room_id)
+        ).fetchone()
+        return dict(r) if r else None
+
 def is_message_processed(message_id: str) -> bool:
     with db() as conn:
         r = conn.execute("SELECT 1 FROM processed_messages WHERE chatwork_message_id = ?", (message_id,)).fetchone()

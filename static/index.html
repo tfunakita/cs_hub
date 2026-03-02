@@ -764,7 +764,7 @@ function renderKanbanCard(t) {
       ondragstart="onDragStart(event, ${t.id})"
       ondragend="onDragEnd(event)"
       onclick="openTask(${t.id})">
-      <div class="kanban-card-title">${esc(t.summary || t.title)}</div>
+      <div class="kanban-card-title">${esc(t.summary || t.title)}${t.unread_reply ? '<span class="unread-dot" title="新着返信あり"></span>' : ''}</div>
       <div class="kanban-card-meta">
         ${pri}${due}
         ${t.chatwork_room_name ? `<span class="kanban-card-sender">📢 ${esc(t.chatwork_room_name)}</span>` : ''}
