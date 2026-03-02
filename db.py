@@ -95,6 +95,11 @@ def init_db():
             conn.execute("ALTER TABLE tasks ADD COLUMN chatwork_room_name TEXT")
         except Exception:
             pass
+        # 既存タスクのchatwork_message_idをprocessed_messagesに同期（重複防止）
+        conn.execute("""
+            INSERT OR IGNORE INTO processed_messages (chatwork_message_id)
+            SELECT chatwork_message_id FROM tasks WHERE chatwork_message_id IS NOT NULL
+        """)
 
 # ─── Tasks ────────────────────────────────────────────────────
 
@@ -163,7 +168,14 @@ def delete_task(task_id: int):
 def is_message_processed(message_id: str) -> bool:
     with db() as conn:
         r = conn.execute("SELECT 1 FROM processed_messages WHERE chatwork_message_id = ?", (message_id,)).fetchone()
-        return r is not None
+        if r:
+            return True
+        # processed_messagesになくても既存タスクにあれば処理済みとみなす
+        r2 = conn.execute("SELECT 1 FROM tasks WHERE chatwork_message_id = ?", (message_id,)).fetchone()
+        if r2:
+            conn.execute("INSERT OR IGNORE INTO processed_messages (chatwork_message_id) VALUES (?)", (message_id,))
+            return True
+        return False
 
 def mark_message_processed(message_id: str):
     with db() as conn:
