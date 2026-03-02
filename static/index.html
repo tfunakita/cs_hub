@@ -473,6 +473,8 @@ function renderBulkBar() {
       </select>
       <input type="date" id="bulk-due" style="background:#334155;border:none;color:#fff;padding:5px 8px;border-radius:5px;font-size:12px" title="期限を変更">
       <button class="btn btn-primary" style="margin-left:4px" onclick="applyBulk()">適用</button>
+      <button class="btn" style="background:#10b981;color:#fff" onclick="bulkComplete()">✅ まとめて完了</button>
+      <button class="btn btn-danger" onclick="bulkDelete()">🗑 まとめて削除</button>
       <button class="btn btn-slate" onclick="clearSelection()">解除</button>
     </div>`;
 }
@@ -1010,6 +1012,21 @@ function renderBulkBarInPlace() {
   } else {
     if (existing) existing.remove();
   }
+}
+
+async function bulkComplete() {
+  if (state.selected.size === 0) return;
+  await api.post('/api/tasks/bulk', { task_ids: [...state.selected], status: 'done' });
+  state.selected.clear();
+  await renderTasks();
+}
+
+async function bulkDelete() {
+  if (state.selected.size === 0) return;
+  if (!confirm(`${state.selected.size}件のタスクを削除しますか？`)) return;
+  await Promise.all([...state.selected].map(id => api.del(`/api/tasks/${id}`)));
+  state.selected.clear();
+  await renderTasks();
 }
 
 async function applyBulk() {
