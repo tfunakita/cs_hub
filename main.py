@@ -376,6 +376,12 @@ async def get_cw_rooms():
         return []
     return await cw_client.get_rooms()
 
+@app.get("/api/chatwork/me")
+async def get_cw_me():
+    if not cw_client:
+        raise HTTPException(500, "Chatwork not configured")
+    return await cw_client.get_me()
+
 @app.get("/api/settings")
 def get_settings():
     result = {}
