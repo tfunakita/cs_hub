@@ -133,11 +133,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-ser
 /* Thread */
 .thread-section { border-top: 1px solid #e2e8f0; padding-top: 16px; }
 .thread-title { font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 10px; }
-.thread-list { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; padding: 2px; }
+.thread-list { display: flex; flex-direction: column; gap: 10px; max-height: 280px; overflow-y: auto; padding: 2px; }
 .thread-msg { padding: 10px 12px; border-radius: 8px; font-size: 13px; line-height: 1.5; }
 .thread-msg.inbound  { background: #f8fafc; border-left: 3px solid #cbd5e1; }
 .thread-msg.outbound { background: #eff6ff; border-left: 3px solid #3b82f6; }
-.thread-meta { font-size: 11px; color: #94a3b8; margin-bottom: 4px; display: flex; gap: 8px; }
+.thread-meta { font-size: 12px; color: #475569; margin-bottom: 5px; display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.thread-meta .thread-time { font-size: 11px; color: #94a3b8; font-weight: 400; }
+.thread-avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; }
+.thread-avatar.inbound  { background: #64748b; }
+.thread-avatar.outbound { background: #3b82f6; }
 .reply-row { display: flex; gap: 8px; align-items: flex-end; }
 .reply-row textarea { flex: 1; border: 1px solid #e2e8f0; border-radius: 7px; padding: 8px 10px; font-size: 13px; resize: none; height: 60px; outline: none; font-family: inherit; }
 .reply-row textarea:focus { border-color: #3b82f6; }
@@ -397,11 +401,21 @@ async function renderTasks() {
     </div>`;
 }
 
+let _allTasksCache = null;
+let _allTasksCacheAt = 0;
+async function getAllTasksCached() {
+  if (_allTasksCache && Date.now() - _allTasksCacheAt < 15000) return _allTasksCache;
+  _allTasksCache = await api.get('/api/tasks');
+  _allTasksCacheAt = Date.now();
+  return _allTasksCache;
+}
+function invalidateTasksCache() { _allTasksCache = null; }
+
 async function getTabCounts() {
   const counts = { all: 0, '未担当': 0, '完了': 0 };
   STAFF.forEach(s => counts[s] = 0);
   try {
-    const all = await api.get('/api/tasks');
+    const all = await getAllTasksCached();
     all.forEach(t => {
       const done = ['done','closed'].includes(t.status);
       if (done) { counts['完了']++; return; }
@@ -502,14 +516,7 @@ async function openTask(taskId) {
 function renderTaskModalBody(task, threads) {
   const threadHtml = threads.length === 0
     ? '<div style="color:#94a3b8;font-size:13px;padding:8px 0">スレッドなし</div>'
-    : threads.map(m => `
-        <div class="thread-msg ${m.direction}">
-          <div class="thread-meta">
-            <span>${esc(m.sender_name || (m.direction==='outbound'?'CS_HUBくん':'不明'))}</span>
-            <span>${fmtDatetime(m.sent_at)}</span>
-          </div>
-          <div>${esc(m.body)}</div>
-        </div>`).join('');
+    : threads.map(m => renderThreadMsg(m)).join('');
 
   return `
     ${task.chatwork_room_name ? `
@@ -653,6 +660,7 @@ async function saveNewTask() {
   };
   try {
     await api.post('/api/tasks', data);
+    invalidateTasksCache();
     closeModal();
     if (state.page === 'tasks') await renderTasks();
     else await renderDashboard();
@@ -668,21 +676,27 @@ async function quickUpdate(taskId, field, value) {
   } catch(e) { console.error(e); }
 }
 
+function renderThreadMsg(m) {
+  const name = m.sender_name || (m.direction === 'outbound' ? 'CS_HUBくん' : '不明');
+  const initial = name.charAt(0);
+  return `
+    <div class="thread-msg ${m.direction}">
+      <div class="thread-meta">
+        <span class="thread-avatar ${m.direction}">${initial}</span>
+        <span>${esc(name)}</span>
+        <span class="thread-time">${fmtDatetime(m.sent_at)}</span>
+      </div>
+      <div style="padding-left:32px">${esc(m.body)}</div>
+    </div>`;
+}
+
 async function sendReply(taskId) {
   const body = document.getElementById('reply-input').value.trim();
   if (!body) return;
   try {
     await api.post(`/api/tasks/${taskId}/reply`, { body });
     const threads = await api.get(`/api/tasks/${taskId}/threads`);
-    const html = threads.map(m => `
-      <div class="thread-msg ${m.direction}">
-        <div class="thread-meta">
-          <span>${esc(m.sender_name || (m.direction==='outbound'?'CS_HUBくん':'不明'))}</span>
-          <span>${fmtDatetime(m.sent_at)}</span>
-        </div>
-        <div>${esc(m.body)}</div>
-      </div>`).join('');
-    document.getElementById('thread-list').innerHTML = html;
+    document.getElementById('thread-list').innerHTML = threads.map(m => renderThreadMsg(m)).join('');
     document.getElementById('reply-input').value = '';
     const tl = document.getElementById('thread-list');
     tl.scrollTop = tl.scrollHeight;
@@ -692,6 +706,7 @@ async function sendReply(taskId) {
 async function completeTask(taskId) {
   try {
     await api.put(`/api/tasks/${taskId}`, { status: 'done' });
+    invalidateTasksCache();
     closeModal();
     if (state.page === 'assign' || state.page === 'tasks') {
       await render();
@@ -705,6 +720,7 @@ async function deleteTask(taskId, fromModal = false) {
   if (!confirm('このタスクを削除しますか？')) return;
   try {
     await api.del(`/api/tasks/${taskId}`);
+    invalidateTasksCache();
     if (fromModal) closeModal();
     if (state.page === 'tasks') await renderTasks();
     else await renderDashboard();
@@ -716,9 +732,8 @@ let dragTaskId = null;
 
 async function renderAssign() {
   const el = document.getElementById('main-content');
-  const all = await api.get('/api/tasks?status=open&status=in_progress').catch(() => []);
-  // 全タスク（完了以外）取得
-  const tasks = await api.get('/api/tasks').catch(() => []);
+  // 全タスク（キャッシュ使用）
+  const tasks = await getAllTasksCached().catch(() => []);
   const active = tasks.filter(t => !['done','closed'].includes(t.status));
 
   const cols = [
@@ -1024,6 +1039,7 @@ function renderBulkBarInPlace() {
 async function bulkComplete() {
   if (state.selected.size === 0) return;
   await api.post('/api/tasks/bulk', { task_ids: [...state.selected], status: 'done' });
+  invalidateTasksCache();
   state.selected.clear();
   await renderTasks();
 }
@@ -1032,6 +1048,7 @@ async function bulkDelete() {
   if (state.selected.size === 0) return;
   if (!confirm(`${state.selected.size}件のタスクを削除しますか？`)) return;
   await Promise.all([...state.selected].map(id => api.del(`/api/tasks/${id}`)));
+  invalidateTasksCache();
   state.selected.clear();
   await renderTasks();
 }
