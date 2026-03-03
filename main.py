@@ -327,14 +327,25 @@ def get_task(task_id: int):
     return t
 
 @app.put("/api/tasks/{task_id}")
-def update_task(task_id: int, body: TaskUpdate):
+async def update_task(task_id: int, body: TaskUpdate):
     t = db.get_task(task_id)
     if not t:
         raise HTTPException(404)
     data = {k: v for k, v in body.dict().items() if v is not None}
-    if data.get("status") in ("done", "closed") and t["status"] not in ("done", "closed"):
+    completing = data.get("status") in ("done", "closed") and t["status"] not in ("done", "closed")
+    if completing:
         data["completed_at"] = datetime.now().isoformat()
     db.update_task(task_id, data)
+    # 完了時にChatworkへ通知
+    if completing and cw_client and t.get("chatwork_room_id"):
+        try:
+            mention = f"[To:{t['sender_account_id']}] {t['sender_name']}さん\n" if t.get("sender_account_id") else ""
+            await cw_client.send_message(
+                t["chatwork_room_id"],
+                f"{mention}✅ 対応完了しました。"
+            )
+        except Exception as e:
+            print(f"[complete notify] {e}")
     return db.get_task(task_id)
 
 @app.delete("/api/tasks/{task_id}", status_code=204)
