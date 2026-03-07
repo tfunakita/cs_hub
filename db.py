@@ -2,6 +2,11 @@ import sqlite3
 import os
 from contextlib import contextmanager
 
+def get_staff_names() -> list[str]:
+    """STAFF_NAMES環境変数からスタッフ名リストを取得"""
+    raw = os.environ.get("STAFF_NAMES", "")
+    return [n.strip() for n in raw.split(",") if n.strip()]
+
 DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "cs_hub.db"))
 
 SCHEMA = """
@@ -281,7 +286,7 @@ def get_dashboard_stats():
 
         # 担当者パフォーマンス
         staff = []
-        for name in ["金子", "和田", "福江"]:
+        for name in get_staff_names():
             holding = conn.execute(
                 "SELECT COUNT(*) FROM tasks WHERE assignee=? AND status NOT IN ('done','closed')", (name,)
             ).fetchone()[0]
