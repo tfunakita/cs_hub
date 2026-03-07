@@ -25,10 +25,11 @@ AI_ENABLED        = os.getenv("AI_SUMMARY_ENABLED", "false").lower() == "true"
 ANTHROPIC_KEY     = os.getenv("ANTHROPIC_API_KEY", "")
 DEFAULT_ASSIGNEE  = os.getenv("DEFAULT_ASSIGNEE", "")
 
+# STAFF_NAMES=金子,和田,福江 で設定。各スタッフのDMルームは STAFF_ROOM_金子=xxx の形式
+STAFF_NAMES = db.get_staff_names()
 STAFF_ROOMS = {
-    "金子": os.getenv("STAFF_KANEKO_ROOM_ID", ""),
-    "和田": os.getenv("STAFF_WADA_ROOM_ID", ""),
-    "福江": os.getenv("STAFF_FUKUE_ROOM_ID", ""),
+    name: os.getenv(f"STAFF_ROOM_{name}", "")
+    for name in STAFF_NAMES
 }
 
 cw_client = cw.ChatworkClient(API_TOKEN) if API_TOKEN else None
@@ -336,16 +337,7 @@ async def update_task(task_id: int, body: TaskUpdate):
     if completing:
         data["completed_at"] = datetime.now().isoformat()
     db.update_task(task_id, data)
-    # 完了時にChatworkへ通知
-    if completing and cw_client and t.get("chatwork_room_id"):
-        try:
-            mention = f"[To:{t['sender_account_id']}] {t['sender_name']}さん\n" if t.get("sender_account_id") else ""
-            await cw_client.send_message(
-                t["chatwork_room_id"],
-                f"{mention}✅ 対応完了しました。"
-            )
-        except Exception as e:
-            print(f"[complete notify] {e}")
+    # 完了時のChatwork通知は無効化
     return db.get_task(task_id)
 
 @app.delete("/api/tasks/{task_id}", status_code=204)
