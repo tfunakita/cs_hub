@@ -140,20 +140,10 @@ async def poll_chatwork():
                         "direction": "inbound",
                     })
                 else:
-                    # [rp] 引用がある場合は参照先メッセージIDでタスクを特定
+                    # [rp] 引用がある場合のみ参照先メッセージIDでタスクを特定
+                    # ※ [rp]のない無関係なメッセージ（Lステップ自動通知など）は紐付けない
                     ref_mid = cw.parse_reply_reference(body)
                     target_task = db.find_task_by_message_id(ref_mid, room_id) if ref_mid else None
-
-                    # 引用なし or 特定できない場合は同ルームで最後に更新されたオープンタスク
-                    if target_task is None:
-                        room_tasks = [
-                            t for t in db.get_tasks()
-                            if t.get("chatwork_room_id") == room_id
-                            and t.get("status") not in ("done", "closed")
-                        ]
-                        # updated_at降順で最新のタスクに紐付け
-                        room_tasks.sort(key=lambda t: t.get("updated_at", ""), reverse=True)
-                        target_task = room_tasks[0] if room_tasks else None
 
                     if target_task:
                         db.add_thread(target_task["id"], {
@@ -364,11 +354,16 @@ async def reply(task_id: int, body: ReplyCreate):
     msg_id = None
     if cw_client and t.get("chatwork_room_id"):
         try:
-            # Re: の引用元を決定（最新inboundスレッド → タスク元メッセージの順で探す）
+            # Re: の引用元を決定（TOは常に元の質問者、引用は元の質問者からの最新inbound）
             threads = db.get_threads(task_id)
-            last_inbound = next((th for th in reversed(threads) if th["direction"] == "inbound"), None)
-            rp_message_id  = (last_inbound or {}).get("chatwork_message_id") or t.get("chatwork_message_id")
-            rp_account_id  = (last_inbound or {}).get("sender_account_id")   or t.get("sender_account_id")
+            rp_account_id = t.get("sender_account_id")
+            last_inbound_from_sender = next(
+                (th for th in reversed(threads)
+                 if th["direction"] == "inbound"
+                 and str(th.get("sender_account_id", "")) == str(rp_account_id)),
+                None
+            )
+            rp_message_id = (last_inbound_from_sender or {}).get("chatwork_message_id") or t.get("chatwork_message_id")
             message_body = body.body
             if rp_message_id and rp_account_id:
                 rp = f"[rp aid={rp_account_id} to={t['chatwork_room_id']}-{rp_message_id}]"
