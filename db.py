@@ -1,6 +1,7 @@
 import sqlite3
 import os
 from contextlib import contextmanager
+from typing import Optional
 
 def get_staff_names() -> list[str]:
     """STAFF_NAMES環境変数からスタッフ名リストを取得"""
@@ -176,7 +177,7 @@ def delete_task(task_id: int):
             )
         conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
 
-def find_task_by_message_id(message_id: str, room_id: str) -> dict | None:
+def find_task_by_message_id(message_id: str, room_id: str) -> Optional[dict]:
     """引用元メッセージIDからタスクを特定（タスク本体 or スレッド内を検索）"""
     with db() as conn:
         # タスク本体のchatwork_message_idと一致

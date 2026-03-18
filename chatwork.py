@@ -43,7 +43,7 @@ def parse_mentions(body: str, hub_account_id: str) -> bool:
     """メッセージにCS_HUBくんへのメンションが含まれるか判定"""
     return f"[To:{hub_account_id}]" in body
 
-def parse_reply_reference(body: str) -> str | None:
+def parse_reply_reference(body: str) -> Optional[str]:
     """[rp aid=X to=ROOM-MESSAGE_ID] から参照先メッセージIDを取得"""
     m = re.search(r'\[rp\s+aid=\d+\s+to=\d+-(\d+)\]', body)
     return m.group(1) if m else None
