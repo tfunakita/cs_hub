@@ -43,6 +43,15 @@ def parse_mentions(body: str, hub_account_id: str) -> bool:
     """メッセージにCS_HUBくんへのメンションが含まれるか判定"""
     return f"[To:{hub_account_id}]" in body
 
+
+def is_relevant_message(body: str, hub_account_id: str, has_our_reply: bool = False) -> bool:
+    """タスク対象として扱うべきメッセージか判定。
+    条件:
+      1. 自分（CS_HUBくん）へのメンションがある
+      2. または、自分がすでに返信した会話の続き（has_our_reply=True）
+    """
+    return parse_mentions(body, hub_account_id) or has_our_reply
+
 def parse_reply_reference(body: str) -> Optional[str]:
     """[rp aid=X to=ROOM-MESSAGE_ID] から参照先メッセージIDを取得"""
     m = re.search(r'\[rp\s+aid=\d+\s+to=\d+-(\d+)\]', body)

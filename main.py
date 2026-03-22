@@ -142,18 +142,23 @@ async def poll_chatwork():
                 else:
                     # [rp] 引用がある場合のみ参照先メッセージIDでタスクを特定
                     # ※ [rp]のない無関係なメッセージ（Lステップ自動通知など）は紐付けない
+                    # ※ CS_HUBくんが一度も返信していないタスクへのスレッド追加も除外
+                    #   →「自分が返信した会話の続き」のみ追跡する
                     ref_mid = cw.parse_reply_reference(body)
                     target_task = db.find_task_by_message_id(ref_mid, room_id) if ref_mid else None
 
                     if target_task:
-                        db.add_thread(target_task["id"], {
-                            "chatwork_message_id": str(m["message_id"]),
-                            "sender_name": m.get("account", {}).get("name", ""),
-                            "sender_account_id": str(m.get("account", {}).get("account_id", "")),
-                            "body": body,
-                            "direction": "inbound",
-                        })
-                        db.update_task(target_task["id"], {})
+                        threads = db.get_threads(target_task["id"])
+                        has_our_reply = any(t["direction"] == "outbound" for t in threads)
+                        if has_our_reply:
+                            db.add_thread(target_task["id"], {
+                                "chatwork_message_id": str(m["message_id"]),
+                                "sender_name": m.get("account", {}).get("name", ""),
+                                "sender_account_id": str(m.get("account", {}).get("account_id", "")),
+                                "body": body,
+                                "direction": "inbound",
+                            })
+                            db.update_task(target_task["id"], {})
 
             max_id = str(max(int(str(m["message_id"])) for m in new_messages))
             db.set_last_message_id(room_id, max_id)
