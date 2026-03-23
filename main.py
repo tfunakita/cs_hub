@@ -449,6 +449,15 @@ async def manual_poll():
     await poll_chatwork()
     return {"status": "ok"}
 
+@app.get("/api/chatwork/rooms/{room_id}/members")
+async def get_room_members(room_id: str):
+    if not cw_client:
+        return []
+    try:
+        return await cw_client.get_room_members(room_id)
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
 @app.get("/api/chatwork/rooms")
 async def get_cw_rooms():
     if not cw_client:

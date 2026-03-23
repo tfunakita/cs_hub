@@ -184,14 +184,30 @@ a, button, input, select, textarea, .badge, .kpi-card, .alert-card, .kanban-card
 .preview-toggle { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; cursor: pointer; font-size: 13px; font-family: inherit; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
 .preview-toggle:hover { background: #eff6ff; border-color: #93c5fd; color: #3b82f6; }
 .preview-toggle.active { background: #eff6ff; border-color: #3b82f6; color: #3b82f6; }
-.cw-preview { border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; background: #fff; font-size: 13px; line-height: 1.7; color: #1e293b; min-height: 60px; max-height: 400px; overflow-y: auto; word-wrap: break-word; white-space: pre-wrap; }
-.cw-preview .cw-info { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 10px 14px; margin: 6px 0; }
-.cw-preview .cw-info-title { font-weight: 700; color: #0369a1; border-bottom: 1px solid #bae6fd; padding-bottom: 6px; margin-bottom: 6px; }
-.cw-preview .cw-code { background: #1e293b; color: #e2e8f0; border-radius: 6px; padding: 10px 14px; margin: 6px 0; font-family: 'SF Mono', Consolas, monospace; font-size: 12px; white-space: pre-wrap; }
-.cw-preview .cw-hr { border: none; border-top: 1px solid #cbd5e1; margin: 8px 0; }
-.cw-preview .cw-mention { color: #2563eb; font-weight: 600; }
-.cw-preview .cw-link { color: #2563eb; text-decoration: underline; }
+/* Chatwork風プレビュー */
+.cw-preview-wrap { background: #e8e5df; border-radius: 8px; padding: 16px; max-height: 400px; overflow-y: auto; }
+.cw-preview-bubble { display: flex; gap: 10px; align-items: flex-start; }
+.cw-preview-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+.cw-preview-body { flex: 1; background: #fff; border-radius: 0 8px 8px 8px; padding: 10px 14px; font-size: 13px; line-height: 1.7; color: #333; word-wrap: break-word; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.cw-preview-sender { font-size: 12px; font-weight: 700; color: #1a6ed8; margin-bottom: 4px; }
+.cw-preview-body .cw-info { background: #e8f4e8; border-left: 4px solid #6eb86e; border-radius: 0; padding: 8px 12px; margin: 6px 0; white-space: pre-wrap; }
+.cw-preview-body .cw-info-title { font-weight: 700; color: #333; border-bottom: 1px solid #c5dcc5; padding-bottom: 4px; margin-bottom: 4px; }
+.cw-preview-body .cw-code { background: #263238; color: #e8e8e8; border-radius: 4px; padding: 8px 12px; margin: 6px 0; font-family: monospace; font-size: 12px; white-space: pre-wrap; }
+.cw-preview-body .cw-hr { border: none; border-top: 1px solid #ccc; margin: 8px 0; }
+.cw-preview-body .cw-mention { color: #1a6ed8; font-weight: 600; }
+.cw-preview-body .cw-link { color: #1a6ed8; text-decoration: underline; }
 .cw-preview-empty { color: #94a3b8; font-style: italic; }
+/* TO追加UI */
+.to-selector { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.to-tag { display: inline-flex; align-items: center; gap: 4px; background: #dbeafe; color: #1d4ed8; padding: 3px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.to-tag button { background: none; border: none; color: #3b82f6; cursor: pointer; font-size: 13px; padding: 0 1px; line-height: 1; }
+.to-tag button:hover { color: #dc2626; }
+.to-add-btn { display: inline-flex; align-items: center; gap: 3px; padding: 4px 10px; border-radius: 12px; border: 1px dashed #93c5fd; background: transparent; color: #3b82f6; cursor: pointer; font-size: 12px; font-family: inherit; transition: all 0.2s; }
+.to-add-btn:hover { background: #eff6ff; border-style: solid; }
+.to-dropdown { position: absolute; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 4px 0; z-index: 300; max-height: 200px; overflow-y: auto; min-width: 180px; }
+.to-dropdown-item { padding: 8px 14px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+.to-dropdown-item:hover { background: #eff6ff; }
+.to-dropdown-item .to-dropdown-avatar { width: 24px; height: 24px; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #475569; }
 
 /* Spinner */
 .spin { display: inline-block; width: 16px; height: 16px; border: 2px solid #e2e8f0; border-top-color: #3b82f6; border-radius: 50%; animation: spin .6s linear infinite; }
@@ -633,10 +649,16 @@ function renderTaskModalBody(task, threads) {
       <div class="thread-list" id="thread-list">${threadHtml}</div>
       ${task.chatwork_room_id ? `
         <div class="reply-row" style="margin-top:10px">
+          <div class="to-selector" id="to-selector" style="position:relative">
+            <span style="font-size:12px;font-weight:600;color:#64748b">TO:</span>
+            <span id="to-tags"></span>
+            <button class="to-add-btn" onclick="toggleToDropdown('${task.chatwork_room_id}')">＋ 追加</button>
+            <div class="to-dropdown" id="to-dropdown" style="display:none"></div>
+          </div>
           <textarea id="reply-input" placeholder="返信を入力（Chatworkにも送信）… Cmd+Enterで送信" oninput="updatePreview()" onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter'){event.preventDefault();sendReply(${task.id});}"></textarea>
           <div id="cw-preview-area" style="display:none">
-            <div style="font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px">Chatworkプレビュー</div>
-            <div class="cw-preview" id="cw-preview-content"></div>
+            <div style="font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px">Chatwork送信イメージ</div>
+            <div class="cw-preview-wrap" id="cw-preview-content"></div>
           </div>
           <div id="attach-preview-area" style="display:none"></div>
           <div class="reply-actions">
@@ -765,6 +787,67 @@ function renderThreadMsg(m) {
     </div>`;
 }
 
+// ─── TO Mention ────────────────────────────────────────────
+let selectedTos = []; // [{account_id, name}, ...]
+let roomMembersCache = {};
+
+async function toggleToDropdown(roomId) {
+  const dd = document.getElementById('to-dropdown');
+  if (dd.style.display !== 'none') { dd.style.display = 'none'; return; }
+  if (!roomMembersCache[roomId]) {
+    dd.innerHTML = '<div style="padding:12px;text-align:center"><span class="spin"></span></div>';
+    dd.style.display = 'block';
+    try {
+      roomMembersCache[roomId] = await api.get(`/api/chatwork/rooms/${roomId}/members`);
+    } catch(e) { dd.innerHTML = '<div style="padding:12px;color:#dc2626;font-size:12px">取得失敗</div>'; return; }
+  }
+  const members = roomMembersCache[roomId];
+  const selectedIds = selectedTos.map(t => String(t.account_id));
+  const available = members.filter(m => !selectedIds.includes(String(m.account_id)));
+  if (available.length === 0) {
+    dd.innerHTML = '<div style="padding:12px;color:#94a3b8;font-size:12px">全員追加済み</div>';
+  } else {
+    dd.innerHTML = available.map(m => `
+      <div class="to-dropdown-item" onclick="addTo('${m.account_id}','${esc(m.name)}')">
+        <span class="to-dropdown-avatar">${esc(m.name).charAt(0)}</span>
+        <span>${esc(m.name)}</span>
+      </div>`).join('');
+  }
+  dd.style.display = 'block';
+  setTimeout(() => document.addEventListener('click', closeToDropdownOnClick, {once:true}), 0);
+}
+
+function closeToDropdownOnClick(e) {
+  const dd = document.getElementById('to-dropdown');
+  if (dd && !dd.contains(e.target)) dd.style.display = 'none';
+}
+
+function addTo(accountId, name) {
+  if (selectedTos.some(t => String(t.account_id) === String(accountId))) return;
+  selectedTos.push({account_id: accountId, name});
+  renderToTags();
+  document.getElementById('to-dropdown').style.display = 'none';
+  updatePreview();
+}
+
+function removeTo(accountId) {
+  selectedTos = selectedTos.filter(t => String(t.account_id) !== String(accountId));
+  renderToTags();
+  updatePreview();
+}
+
+function renderToTags() {
+  const el = document.getElementById('to-tags');
+  if (!el) return;
+  el.innerHTML = selectedTos.map(t =>
+    `<span class="to-tag">${esc(t.name)}<button onclick="removeTo('${t.account_id}')">✕</button></span>`
+  ).join('');
+}
+
+function buildToPrefix() {
+  return selectedTos.map(t => `[To:${t.account_id}] ${t.name}さん`).join('\n') + (selectedTos.length ? '\n' : '');
+}
+
 // ─── Chatwork Preview ──────────────────────────────────────
 let previewEnabled = false;
 
@@ -784,11 +867,20 @@ function updatePreview() {
   const area = document.getElementById('cw-preview-content');
   if (!area) return;
   const text = document.getElementById('reply-input').value;
-  if (!text.trim()) {
-    area.innerHTML = '<span class="cw-preview-empty">メッセージを入力するとプレビューが表示されます</span>';
+  if (!text.trim() && selectedTos.length === 0) {
+    area.innerHTML = '<span class="cw-preview-empty" style="padding:16px;display:block;text-align:center">メッセージを入力するとプレビューが表示されます</span>';
     return;
   }
-  area.innerHTML = renderChatworkMarkup(text);
+  const fullText = buildToPrefix() + text;
+  const bodyHtml = renderChatworkMarkup(fullText);
+  area.innerHTML = `
+    <div class="cw-preview-bubble">
+      <div class="cw-preview-avatar">H</div>
+      <div style="flex:1">
+        <div class="cw-preview-sender">CS_HUBくん</div>
+        <div class="cw-preview-body">${bodyHtml}</div>
+      </div>
+    </div>`;
 }
 
 function renderChatworkMarkup(text) {
@@ -804,12 +896,11 @@ function renderChatworkMarkup(text) {
     '<div class="cw-code">$1</div>');
   // [hr]
   html = html.replace(/\[hr\]/g, '<hr class="cw-hr">');
-  // [To:12345]名前
+  // [To:12345] 名前さん
   html = html.replace(/\[To:\d+\]\s*([^\n]*)/g,
     '<span class="cw-mention">To $1</span>');
-  // [rp aid=... to=...]...[/rp] or just [rp ...]
-  html = html.replace(/\[rp\s+[^\]]*\][^\n]*/g,
-    '<span style="color:#94a3b8;font-size:12px">(引用返信)</span>');
+  // [rp aid=... to=...]
+  html = html.replace(/\[rp\s+[^\]]*\][^\n]*/g, '');
   // [piconname:...] [picon:...]
   html = html.replace(/\[piconname:[^\]]*\]/g, '');
   html = html.replace(/\[picon:[^\]]*\]/g, '');
@@ -862,10 +953,12 @@ function formatFileSize(bytes) {
 }
 
 async function sendReply(taskId) {
-  const body = document.getElementById('reply-input').value.trim();
+  const rawBody = document.getElementById('reply-input').value.trim();
   const fileInput = document.getElementById('reply-file');
   const hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
-  if (!body && !hasFile) return;
+  if (!rawBody && !hasFile) return;
+  const toPrefix = buildToPrefix();
+  const body = toPrefix + rawBody;
   try {
     if (hasFile) {
       const formData = new FormData();
@@ -879,6 +972,8 @@ async function sendReply(taskId) {
     const threads = await api.get(`/api/tasks/${taskId}/threads`);
     document.getElementById('thread-list').innerHTML = threads.map(m => renderThreadMsg(m)).join('');
     document.getElementById('reply-input').value = '';
+    selectedTos = [];
+    renderToTags();
     clearAttachment();
     updatePreview();
     const tl = document.getElementById('thread-list');
