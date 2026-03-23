@@ -4,7 +4,7 @@ from datetime import datetime, date, timedelta
 from typing import Optional, List
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Form, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -382,6 +382,55 @@ async def reply(task_id: int, body: ReplyCreate):
         "chatwork_message_id": msg_id,
         "sender_name": "CS_HUBくん",
         "body": body.body,
+        "direction": "outbound",
+    })
+    db.update_task(task_id, {})
+    return {"id": thread_id}
+
+@app.post("/api/tasks/{task_id}/reply-with-file", status_code=201)
+async def reply_with_file(task_id: int, body: str = Form(""), file: Optional[UploadFile] = File(None)):
+    t = db.get_task(task_id)
+    if not t:
+        raise HTTPException(404)
+    msg_id = None
+    thread_body = body
+
+    if cw_client and t.get("chatwork_room_id"):
+        try:
+            # Re: の引用元を決定
+            threads = db.get_threads(task_id)
+            rp_account_id = t.get("sender_account_id")
+            last_inbound_from_sender = next(
+                (th for th in reversed(threads)
+                 if th["direction"] == "inbound"
+                 and str(th.get("sender_account_id", "")) == str(rp_account_id)),
+                None
+            )
+            rp_message_id = (last_inbound_from_sender or {}).get("chatwork_message_id") or t.get("chatwork_message_id")
+            rp_prefix = ""
+            if rp_message_id and rp_account_id:
+                rp_prefix = f"[rp aid={rp_account_id} to={t['chatwork_room_id']}-{rp_message_id}]\n"
+
+            if file and file.filename:
+                file_content = await file.read()
+                message_text = rp_prefix + body if body else rp_prefix.rstrip("\n")
+                res = await cw_client.upload_file(
+                    t["chatwork_room_id"], file_content, file.filename, message_text
+                )
+                msg_id = str(res.get("file_id", ""))
+                thread_body = body + (f"\n📎 {file.filename}" if body else f"📎 {file.filename}")
+            else:
+                message_body = rp_prefix + body if body else body
+                res = await cw_client.send_message(t["chatwork_room_id"], message_body)
+                msg_id = str(res.get("message_id", ""))
+        except Exception as e:
+            print(f"[reply-with-file] send error: {e}")
+            raise HTTPException(500, f"Chatwork送信失敗: {e}")
+
+    thread_id = db.add_thread(task_id, {
+        "chatwork_message_id": msg_id,
+        "sender_name": "CS_HUBくん",
+        "body": thread_body,
         "direction": "outbound",
     })
     db.update_task(task_id, {})

@@ -170,9 +170,17 @@ a, button, input, select, textarea, .badge, .kpi-card, .alert-card, .kanban-card
 .thread-avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; }
 .thread-avatar.inbound  { background: linear-gradient(135deg, #64748b, #475569); }
 .thread-avatar.outbound { background: linear-gradient(135deg, #3b82f6, #6366f1); }
-.reply-row { display: flex; gap: 8px; align-items: flex-end; }
-.reply-row textarea { flex: 1; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; font-size: 13px; resize: none; height: 60px; outline: none; font-family: inherit; background: #f8fafc; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+.reply-row { display: flex; flex-direction: column; gap: 8px; }
+.reply-row textarea { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; font-size: 13px; resize: vertical; min-height: 120px; max-height: 300px; outline: none; font-family: inherit; background: #f8fafc; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
 .reply-row textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.15); background: #fff; }
+.reply-actions { display: flex; align-items: center; gap: 8px; }
+.attach-btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; cursor: pointer; font-size: 13px; font-family: inherit; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+.attach-btn:hover { background: #eff6ff; border-color: #93c5fd; color: #3b82f6; }
+.attach-info { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #475569; background: #f1f5f9; padding: 4px 10px; border-radius: 6px; }
+.attach-info .remove-attach { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 14px; padding: 0 2px; line-height: 1; }
+.attach-info .remove-attach:hover { color: #dc2626; }
+.attach-preview { max-width: 120px; max-height: 80px; border-radius: 6px; border: 1px solid #e2e8f0; object-fit: cover; }
+.reply-actions .btn-primary { margin-left: auto; }
 
 /* Spinner */
 .spin { display: inline-block; width: 16px; height: 16px; border: 2px solid #e2e8f0; border-top-color: #3b82f6; border-radius: 50%; animation: spin .6s linear infinite; }
@@ -615,7 +623,13 @@ function renderTaskModalBody(task, threads) {
       ${task.chatwork_room_id ? `
         <div class="reply-row" style="margin-top:10px">
           <textarea id="reply-input" placeholder="返信を入力（Chatworkにも送信）… Cmd+Enterで送信" onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter'){event.preventDefault();sendReply(${task.id});}"></textarea>
-          <button class="btn btn-primary" onclick="sendReply(${task.id})">送信</button>
+          <div id="attach-preview-area" style="display:none"></div>
+          <div class="reply-actions">
+            <input type="file" id="reply-file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip" style="display:none" onchange="onFileSelected(this)">
+            <button class="attach-btn" onclick="document.getElementById('reply-file').click()">📎 ファイル添付</button>
+            <span id="attach-info" style="display:none"></span>
+            <button class="btn btn-primary" onclick="sendReply(${task.id})">送信</button>
+          </div>
         </div>` : ''}
     </div>`;
 }
@@ -735,14 +749,65 @@ function renderThreadMsg(m) {
     </div>`;
 }
 
+function onFileSelected(input) {
+  const previewArea = document.getElementById('attach-preview-area');
+  const infoEl = document.getElementById('attach-info');
+  if (!input.files || input.files.length === 0) {
+    previewArea.style.display = 'none';
+    previewArea.innerHTML = '';
+    infoEl.style.display = 'none';
+    return;
+  }
+  const file = input.files[0];
+  infoEl.innerHTML = `<span class="attach-info">${esc(file.name)} (${formatFileSize(file.size)})<button class="remove-attach" onclick="clearAttachment()" title="削除">✕</button></span>`;
+  infoEl.style.display = 'inline';
+  if (file.type.startsWith('image/')) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      previewArea.innerHTML = `<img src="${e.target.result}" class="attach-preview">`;
+      previewArea.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  } else {
+    previewArea.style.display = 'none';
+    previewArea.innerHTML = '';
+  }
+}
+
+function clearAttachment() {
+  const fileInput = document.getElementById('reply-file');
+  if (fileInput) fileInput.value = '';
+  const previewArea = document.getElementById('attach-preview-area');
+  if (previewArea) { previewArea.style.display = 'none'; previewArea.innerHTML = ''; }
+  const infoEl = document.getElementById('attach-info');
+  if (infoEl) { infoEl.style.display = 'none'; infoEl.innerHTML = ''; }
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
 async function sendReply(taskId) {
   const body = document.getElementById('reply-input').value.trim();
-  if (!body) return;
+  const fileInput = document.getElementById('reply-file');
+  const hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
+  if (!body && !hasFile) return;
   try {
-    await api.post(`/api/tasks/${taskId}/reply`, { body });
+    if (hasFile) {
+      const formData = new FormData();
+      formData.append('body', body);
+      formData.append('file', fileInput.files[0]);
+      const r = await fetch(`/api/tasks/${taskId}/reply-with-file`, { method: 'POST', body: formData });
+      if (!r.ok) throw new Error(await r.text());
+    } else {
+      await api.post(`/api/tasks/${taskId}/reply`, { body });
+    }
     const threads = await api.get(`/api/tasks/${taskId}/threads`);
     document.getElementById('thread-list').innerHTML = threads.map(m => renderThreadMsg(m)).join('');
     document.getElementById('reply-input').value = '';
+    clearAttachment();
     const tl = document.getElementById('thread-list');
     tl.scrollTop = tl.scrollHeight;
   } catch(e) { alert('送信失敗: ' + e.message); }

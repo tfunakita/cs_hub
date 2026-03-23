@@ -35,6 +35,21 @@ class ChatworkClient:
     async def send_message(self, room_id: str, body: str) -> dict:
         return await self._post(f"/rooms/{room_id}/messages", {"body": body, "self_unread": 0})
 
+    async def upload_file(self, room_id: str, file_content: bytes, filename: str, message: str = "") -> dict:
+        async with httpx.AsyncClient(timeout=30) as client:
+            files = {"file": (filename, file_content)}
+            data = {}
+            if message:
+                data["message"] = message
+            r = await client.post(
+                f"{BASE}/rooms/{room_id}/files",
+                headers=self.headers,
+                files=files,
+                data=data,
+            )
+            r.raise_for_status()
+            return r.json()
+
     async def get_room_members(self, room_id: str) -> list:
         return await self._get(f"/rooms/{room_id}/members")
 
