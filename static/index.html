@@ -181,6 +181,17 @@ a, button, input, select, textarea, .badge, .kpi-card, .alert-card, .kanban-card
 .attach-info .remove-attach:hover { color: #dc2626; }
 .attach-preview { max-width: 120px; max-height: 80px; border-radius: 6px; border: 1px solid #e2e8f0; object-fit: cover; }
 .reply-actions .btn-primary { margin-left: auto; }
+.preview-toggle { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; cursor: pointer; font-size: 13px; font-family: inherit; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+.preview-toggle:hover { background: #eff6ff; border-color: #93c5fd; color: #3b82f6; }
+.preview-toggle.active { background: #eff6ff; border-color: #3b82f6; color: #3b82f6; }
+.cw-preview { border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; background: #fff; font-size: 13px; line-height: 1.7; color: #1e293b; min-height: 60px; max-height: 400px; overflow-y: auto; word-wrap: break-word; white-space: pre-wrap; }
+.cw-preview .cw-info { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 10px 14px; margin: 6px 0; }
+.cw-preview .cw-info-title { font-weight: 700; color: #0369a1; border-bottom: 1px solid #bae6fd; padding-bottom: 6px; margin-bottom: 6px; }
+.cw-preview .cw-code { background: #1e293b; color: #e2e8f0; border-radius: 6px; padding: 10px 14px; margin: 6px 0; font-family: 'SF Mono', Consolas, monospace; font-size: 12px; white-space: pre-wrap; }
+.cw-preview .cw-hr { border: none; border-top: 1px solid #cbd5e1; margin: 8px 0; }
+.cw-preview .cw-mention { color: #2563eb; font-weight: 600; }
+.cw-preview .cw-link { color: #2563eb; text-decoration: underline; }
+.cw-preview-empty { color: #94a3b8; font-style: italic; }
 
 /* Spinner */
 .spin { display: inline-block; width: 16px; height: 16px; border: 2px solid #e2e8f0; border-top-color: #3b82f6; border-radius: 50%; animation: spin .6s linear infinite; }
@@ -622,12 +633,17 @@ function renderTaskModalBody(task, threads) {
       <div class="thread-list" id="thread-list">${threadHtml}</div>
       ${task.chatwork_room_id ? `
         <div class="reply-row" style="margin-top:10px">
-          <textarea id="reply-input" placeholder="返信を入力（Chatworkにも送信）… Cmd+Enterで送信" onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter'){event.preventDefault();sendReply(${task.id});}"></textarea>
+          <textarea id="reply-input" placeholder="返信を入力（Chatworkにも送信）… Cmd+Enterで送信" oninput="updatePreview()" onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter'){event.preventDefault();sendReply(${task.id});}"></textarea>
+          <div id="cw-preview-area" style="display:none">
+            <div style="font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px">Chatworkプレビュー</div>
+            <div class="cw-preview" id="cw-preview-content"></div>
+          </div>
           <div id="attach-preview-area" style="display:none"></div>
           <div class="reply-actions">
             <input type="file" id="reply-file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip" style="display:none" onchange="onFileSelected(this)">
             <button class="attach-btn" onclick="document.getElementById('reply-file').click()">📎 ファイル添付</button>
             <span id="attach-info" style="display:none"></span>
+            <button class="preview-toggle" id="preview-toggle-btn" onclick="togglePreview()">👁 プレビュー</button>
             <button class="btn btn-primary" onclick="sendReply(${task.id})">送信</button>
           </div>
         </div>` : ''}
@@ -749,6 +765,62 @@ function renderThreadMsg(m) {
     </div>`;
 }
 
+// ─── Chatwork Preview ──────────────────────────────────────
+let previewEnabled = false;
+
+function togglePreview() {
+  previewEnabled = !previewEnabled;
+  const btn = document.getElementById('preview-toggle-btn');
+  const area = document.getElementById('cw-preview-area');
+  if (btn) btn.classList.toggle('active', previewEnabled);
+  if (area) {
+    area.style.display = previewEnabled ? 'block' : 'none';
+    if (previewEnabled) updatePreview();
+  }
+}
+
+function updatePreview() {
+  if (!previewEnabled) return;
+  const area = document.getElementById('cw-preview-content');
+  if (!area) return;
+  const text = document.getElementById('reply-input').value;
+  if (!text.trim()) {
+    area.innerHTML = '<span class="cw-preview-empty">メッセージを入力するとプレビューが表示されます</span>';
+    return;
+  }
+  area.innerHTML = renderChatworkMarkup(text);
+}
+
+function renderChatworkMarkup(text) {
+  let html = esc(text);
+  // [info][title]...[/title]...[/info]
+  html = html.replace(/\[info\]\[title\]([\s\S]*?)\[\/title\]([\s\S]*?)\[\/info\]/g,
+    '<div class="cw-info"><div class="cw-info-title">$1</div>$2</div>');
+  // [info]...[/info]
+  html = html.replace(/\[info\]([\s\S]*?)\[\/info\]/g,
+    '<div class="cw-info">$1</div>');
+  // [code]...[/code]
+  html = html.replace(/\[code\]([\s\S]*?)\[\/code\]/g,
+    '<div class="cw-code">$1</div>');
+  // [hr]
+  html = html.replace(/\[hr\]/g, '<hr class="cw-hr">');
+  // [To:12345]名前
+  html = html.replace(/\[To:\d+\]\s*([^\n]*)/g,
+    '<span class="cw-mention">To $1</span>');
+  // [rp aid=... to=...]...[/rp] or just [rp ...]
+  html = html.replace(/\[rp\s+[^\]]*\][^\n]*/g,
+    '<span style="color:#94a3b8;font-size:12px">(引用返信)</span>');
+  // [piconname:...] [picon:...]
+  html = html.replace(/\[piconname:[^\]]*\]/g, '');
+  html = html.replace(/\[picon:[^\]]*\]/g, '');
+  // URL auto-link
+  html = html.replace(/(https?:\/\/[^\s<]+)/g,
+    '<span class="cw-link">$1</span>');
+  // line breaks
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
 function onFileSelected(input) {
   const previewArea = document.getElementById('attach-preview-area');
   const infoEl = document.getElementById('attach-info');
@@ -808,6 +880,7 @@ async function sendReply(taskId) {
     document.getElementById('thread-list').innerHTML = threads.map(m => renderThreadMsg(m)).join('');
     document.getElementById('reply-input').value = '';
     clearAttachment();
+    updatePreview();
     const tl = document.getElementById('thread-list');
     tl.scrollTop = tl.scrollHeight;
   } catch(e) { alert('送信失敗: ' + e.message); }
