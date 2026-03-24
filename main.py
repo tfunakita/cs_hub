@@ -1,5 +1,8 @@
 import os
 import asyncio
+import csv
+import io
+import time
 from datetime import datetime, date, timedelta
 from typing import Optional, List
 from contextlib import asynccontextmanager
@@ -510,6 +513,174 @@ def get_config():
         "ai_enabled": AI_ENABLED,
         "staff_rooms": STAFF_ROOMS,
     }
+
+# ─── WBS API ─────────────────────────────────────────────────
+
+WBS_CSV_URL = "https://docs.google.com/spreadsheets/d/1tWrjUgGjUfjISUrfWzz41YiQdMS4IWeI5QhVzG7Dm3c/export?format=csv&gid=1413688942"
+_wbs_cache = None        # type: Optional[dict]
+_wbs_cache_at = 0.0      # timestamp
+
+async def fetch_wbs_data() -> dict:
+    global _wbs_cache, _wbs_cache_at
+    now = time.time()
+    if _wbs_cache and now - _wbs_cache_at < 60:
+        return _wbs_cache
+
+    import httpx
+    async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
+        resp = await client.get(WBS_CSV_URL)
+        resp.raise_for_status()
+
+    text = resp.text
+    reader = csv.reader(io.StringIO(text))
+    all_rows = list(reader)
+
+    # CSVの構造: 1行目=空, 2行目=ヘッダー, 3行目=空, 4行目〜=データ
+    data_rows = all_rows[3:] if len(all_rows) > 3 else []
+
+    today = date.today()
+    tasks = []
+    for row in data_rows:
+        if len(row) < 11:
+            continue
+        # index: 0=空, 1=No, 2=カテゴリ, 3=メッセージ/タスク, 4=やりとり場所, 5=URL, 6=担当, 7=期日, 8=ステータス, 9=重要度, 10=備考
+        no = row[1].strip()
+        if not no:
+            continue
+        category = row[2].strip()
+        title = row[3].strip().split('\n')[0][:80]  # 1行目だけ、80文字まで
+        assignee = row[6].strip()
+        due_str = row[7].strip()
+        status = row[8].strip()
+        importance = row[9].strip()
+        note = row[10].strip() if len(row) > 10 else ""
+
+        if not status and not title:
+            continue
+
+        due_date = None  # type: Optional[date]
+        if due_str:
+            try:
+                due_date = datetime.strptime(due_str, "%y/%m/%d").date()
+            except ValueError:
+                pass
+
+        tasks.append({
+            "no": no,
+            "category": category,
+            "title": title,
+            "assignee": assignee,
+            "importance": importance,
+            "status": status,
+            "due_date": due_date,
+            "due_str": due_str,
+            "note": note,
+        })
+
+    # --- 分析 ---
+    total = len(tasks)
+    done = sum(1 for t in tasks if t["status"] == "完了")
+    active = total - done
+    completion_rate = round(done / total * 100, 1) if total else 0
+
+    overdue_list = []
+    due_today_list = []
+    due_this_week_list = []
+    week_end = today + timedelta(days=7)
+
+    for t in tasks:
+        if t["status"] == "完了":
+            continue
+        d = t["due_date"]
+        if not d:
+            continue
+        if d < today:
+            overdue_list.append(t)
+        elif d == today:
+            due_today_list.append(t)
+        elif d <= week_end:
+            due_this_week_list.append(t)
+
+    # ステータス別
+    status_breakdown = {}  # type: dict
+    for t in tasks:
+        s = t["status"] or "不明"
+        status_breakdown[s] = status_breakdown.get(s, 0) + 1
+
+    # 担当者別
+    assignee_map = {}  # type: dict
+    for t in tasks:
+        a = t["assignee"] or "未担当"
+        if a not in assignee_map:
+            assignee_map[a] = {"total": 0, "done": 0, "in_progress": 0, "not_started": 0, "on_hold": 0, "requested": 0}
+        assignee_map[a]["total"] += 1
+        if t["status"] == "完了":
+            assignee_map[a]["done"] += 1
+        elif t["status"] == "対応中":
+            assignee_map[a]["in_progress"] += 1
+        elif t["status"] == "未着手":
+            assignee_map[a]["not_started"] += 1
+        elif t["status"] == "保留":
+            assignee_map[a]["on_hold"] += 1
+        elif t["status"] == "依頼中":
+            assignee_map[a]["requested"] += 1
+
+    assignee_breakdown = []
+    for name, v in sorted(assignee_map.items(), key=lambda x: -x[1]["total"]):
+        cr = round(v["done"] / v["total"] * 100, 1) if v["total"] else 0
+        assignee_breakdown.append({
+            "name": name, "total": v["total"], "done": v["done"],
+            "in_progress": v["in_progress"], "not_started": v["not_started"],
+            "on_hold": v["on_hold"], "requested": v["requested"],
+            "completion_rate": cr,
+        })
+
+    # 重要度別
+    importance_breakdown = {}  # type: dict
+    for t in tasks:
+        imp = t["importance"] or "通常"
+        importance_breakdown[imp] = importance_breakdown.get(imp, 0) + 1
+
+    # カテゴリ別
+    category_map = {}  # type: dict
+    for t in tasks:
+        c = t["category"] or "その他"
+        category_map[c] = category_map.get(c, 0) + 1
+    category_breakdown = [{"name": k, "count": v} for k, v in sorted(category_map.items(), key=lambda x: -x[1])]
+
+    def alert_item(t):
+        return {"title": t["title"], "assignee": t["assignee"], "due": t["due_str"], "importance": t["importance"]}
+
+    result = {
+        "kpi": {
+            "total": total, "active": active, "done": done,
+            "completion_rate": completion_rate,
+            "overdue_count": len(overdue_list),
+            "due_today_count": len(due_today_list),
+        },
+        "status_breakdown": status_breakdown,
+        "assignee_breakdown": assignee_breakdown,
+        "alerts": {
+            "overdue": [alert_item(t) for t in overdue_list],
+            "due_today": [alert_item(t) for t in due_today_list],
+            "due_this_week": [alert_item(t) for t in due_this_week_list],
+        },
+        "importance_breakdown": importance_breakdown,
+        "category_breakdown": category_breakdown,
+    }
+
+    _wbs_cache = result
+    _wbs_cache_at = now
+    return result
+
+
+@app.get("/api/wbs")
+async def get_wbs():
+    try:
+        return await fetch_wbs_data()
+    except Exception as e:
+        raise HTTPException(500, f"WBSデータ取得失敗: {e}")
+
 
 # ─── Recurring API ────────────────────────────────────────────
 

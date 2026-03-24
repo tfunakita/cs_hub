@@ -233,12 +233,39 @@ a, button, input, select, textarea, .badge, .kpi-card, .alert-card, .kanban-card
 .kanban-card-sender { font-size: 11px; color: #94a3b8; }
 .kanban-empty { padding: 24px 16px; text-align: center; color: #cbd5e1; font-size: 13px; }
 
+/* WBS Section */
+.wbs-section { margin-top: 28px; }
+.wbs-section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.wbs-section-header h2 { font-size: 16px; font-weight: 700; color: #1e293b; }
+.wbs-section-header .wbs-badge { background: linear-gradient(135deg, #dbeafe, #c7d2fe); color: #4338ca; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 12px; }
+.wbs-kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 18px; }
+.wbs-status-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 18px; }
+.wbs-status-card { background: #fff; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06); text-align: center; }
+.wbs-status-card .wbs-status-label { font-size: 12px; color: #64748b; font-weight: 600; margin-bottom: 4px; }
+.wbs-status-card .wbs-status-value { font-size: 22px; font-weight: 800; color: #1e293b; }
+.wbs-status-card .wbs-status-pct { font-size: 11px; color: #94a3b8; }
+.wbs-importance-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+.wbs-importance-card { background: #fff; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06); text-align: center; }
+.wbs-importance-card .imp-label { font-size: 12px; color: #64748b; font-weight: 600; margin-bottom: 4px; }
+.wbs-importance-card .imp-value { font-size: 22px; font-weight: 800; color: #1e293b; }
+.wbs-progress-bar { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
+.wbs-progress-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #6366f1); border-radius: 3px; transition: width 0.4s ease; }
+.wbs-category-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 18px; }
+.wbs-category-card { background: #fff; border-radius: 10px; padding: 14px 18px; box-shadow: 0 1px 3px rgba(0,0,0,.06); display: flex; align-items: center; justify-content: space-between; }
+.wbs-category-card .cat-name { font-size: 14px; font-weight: 600; color: #1e293b; }
+.wbs-category-card .cat-count { font-size: 20px; font-weight: 800; color: #3b82f6; }
+.badge-hotta { background: linear-gradient(135deg, #fce7f3, #fbcfe8); color: #9d174d; }
+
 /* Responsive */
 @media (max-width: 900px) {
   .kpi-grid { grid-template-columns: repeat(3, 1fr); }
   .alert-grid { grid-template-columns: 1fr; }
   .field-row { grid-template-columns: 1fr 1fr; }
   .kanban-board { grid-template-columns: 1fr 1fr; }
+  .wbs-kpi-grid { grid-template-columns: repeat(3, 1fr); }
+  .wbs-status-grid { grid-template-columns: repeat(3, 1fr); }
+  .wbs-importance-grid { grid-template-columns: repeat(2, 1fr); }
+  .wbs-category-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
   .header { padding: 0 12px; gap: 8px; }
@@ -255,6 +282,9 @@ a, button, input, select, textarea, .badge, .kpi-card, .alert-card, .kanban-card
   .modal { max-width: 100vw; max-height: 95vh; border-radius: 12px 12px 0 0; }
   .toolbar { flex-wrap: wrap; }
   .search-input { width: 100%; }
+  .wbs-kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .wbs-status-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .wbs-importance-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
 }
 </style>
 </head>
@@ -300,6 +330,7 @@ let state = {
   selected: new Set(),
   filters: { status: '', priority: '', search: '' },
   dashData: null,
+  wbsData: null,
   editingId: null,
 };
 
@@ -348,8 +379,12 @@ async function renderDashboard() {
   const el = document.getElementById('main-content');
   el.innerHTML = '<div style="padding:40px;text-align:center"><div class="spin"></div></div>';
   try {
-    const d = await api.get('/api/dashboard');
+    const [d, wbs] = await Promise.all([
+      api.get('/api/dashboard'),
+      api.get('/api/wbs').catch(() => null),
+    ]);
     state.dashData = d;
+    state.wbsData = wbs;
     const k = d.kpi;
     el.innerHTML = `
       <div class="kpi-grid">
@@ -377,7 +412,8 @@ async function renderDashboard() {
             <td>${s.avg_days != null ? s.avg_days + '日' : '—'}</td>
           </tr>`).join('')}
         </tbody>
-      </table>`;
+      </table>
+      ${wbs ? renderWbsSection(wbs) : ''}`;
   } catch(e) {
     el.innerHTML = `<div style="padding:20px;color:#dc2626">読み込みエラー: ${e.message}</div>`;
   }
@@ -1396,6 +1432,7 @@ function staffClass(name) {
   if (name === '金子') return 'badge-kaneko';
   if (name === '和田')  return 'badge-wada';
   if (name === '福江') return 'badge-fukue';
+  if (name === '堀田') return 'badge-hotta';
   return 'badge-none';
 }
 
@@ -1409,6 +1446,126 @@ function fmtDatetime(s) {
   if (!s) return '—';
   const d = new Date(s);
   return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+// ─── WBS Section ───────────────────────────────────────────
+function renderWbsSection(wbs) {
+  const k = wbs.kpi;
+  const sb = wbs.status_breakdown;
+  const total = k.total || 1;
+
+  // ステータスカード
+  const statusOrder = ['完了', '対応中', '未着手', '保留', '依頼中'];
+  const statusColors = { '完了': '#10b981', '対応中': '#3b82f6', '未着手': '#64748b', '保留': '#d97706', '依頼中': '#8b5cf6' };
+  const statusCards = statusOrder.map(s => {
+    const cnt = sb[s] || 0;
+    const pct = total ? (cnt / total * 100).toFixed(1) : 0;
+    return `<div class="wbs-status-card" style="border-top:3px solid ${statusColors[s] || '#94a3b8'}">
+      <div class="wbs-status-label">${s}</div>
+      <div class="wbs-status-value" style="color:${statusColors[s] || '#1e293b'}">${cnt}</div>
+      <div class="wbs-status-pct">${pct}%</div>
+    </div>`;
+  }).join('');
+
+  // 担当者テーブル
+  const assigneeRows = wbs.assignee_breakdown.map(a => `
+    <tr>
+      <td><span class="badge ${staffClass(a.name)}">${esc(a.name)}</span></td>
+      <td style="font-weight:600">${a.total}</td>
+      <td style="color:#10b981">${a.done}</td>
+      <td style="color:#3b82f6">${a.in_progress}</td>
+      <td style="color:#64748b">${a.not_started}</td>
+      <td style="color:#d97706">${a.on_hold}</td>
+      <td style="color:#8b5cf6">${a.requested}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="wbs-progress-bar" style="flex:1">
+            <div class="wbs-progress-fill" style="width:${a.completion_rate}%"></div>
+          </div>
+          <span style="font-size:12px;font-weight:600;color:#475569;min-width:40px">${a.completion_rate}%</span>
+        </div>
+      </td>
+    </tr>`).join('');
+
+  // 重要度カード
+  const impOrder = ['通常', '★', '★★', '★★★'];
+  const impColors = ['#64748b', '#d97706', '#ea580c', '#dc2626'];
+  const impCards = impOrder.map((imp, i) => {
+    const cnt = wbs.importance_breakdown[imp] || 0;
+    return `<div class="wbs-importance-card" style="border-top:3px solid ${impColors[i]}">
+      <div class="imp-label">${imp === '通常' ? '通常' : imp}</div>
+      <div class="imp-value" style="color:${impColors[i]}">${cnt}</div>
+    </div>`;
+  }).join('');
+
+  // カテゴリカード
+  const catCards = wbs.category_breakdown.map(c =>
+    `<div class="wbs-category-card">
+      <span class="cat-name">${esc(c.name)}</span>
+      <span class="cat-count">${c.count}</span>
+    </div>`
+  ).join('');
+
+  return `
+    <div class="wbs-section">
+      <div class="wbs-section-header">
+        <h2>📊 WBS タスク分析</h2>
+        <span class="wbs-badge">Google Sheets連携</span>
+      </div>
+
+      <div class="wbs-kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">総タスク</div><div class="kpi-value">${k.total}</div></div>
+        <div class="kpi-card"><div class="kpi-label">アクティブ</div><div class="kpi-value blue">${k.active}</div></div>
+        <div class="kpi-card"><div class="kpi-label">完了</div><div class="kpi-value green">${k.done}</div></div>
+        <div class="kpi-card"><div class="kpi-label">完了率</div><div class="kpi-value">${k.completion_rate}%</div></div>
+        <div class="kpi-card" style="border-top:none"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#dc2626,#ef4444);border-radius:3px 3px 0 0"></div><div class="kpi-label">期限超過</div><div class="kpi-value" style="background:linear-gradient(135deg,#dc2626,#ef4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">${k.overdue_count}</div></div>
+        <div class="kpi-card"><div class="kpi-label">本日期限</div><div class="kpi-value" style="background:linear-gradient(135deg,#d97706,#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">${k.due_today_count}</div></div>
+      </div>
+
+      <div class="section-title">ステータス別</div>
+      <div class="wbs-status-grid">${statusCards}</div>
+
+      <div class="section-title">担当者別パフォーマンス</div>
+      <table class="staff-table">
+        <thead><tr>
+          <th>担当者</th><th>合計</th><th>完了</th><th>対応中</th><th>未着手</th><th>保留</th><th>依頼中</th><th>完了率</th>
+        </tr></thead>
+        <tbody>${assigneeRows}</tbody>
+      </table>
+
+      <div class="section-title" style="margin-top:18px">期限アラート</div>
+      <div class="alert-grid">
+        ${renderWbsAlertCard('期限超過', wbs.alerts.overdue, 'red', '🚨')}
+        ${renderWbsAlertCard('本日期限', wbs.alerts.due_today, 'amber', '⏰')}
+        ${renderWbsAlertCard('今週期限', wbs.alerts.due_this_week, 'slate', '📅')}
+      </div>
+
+      <div class="section-title">重要度分布</div>
+      <div class="wbs-importance-grid">${impCards}</div>
+
+      <div class="section-title">カテゴリ分析</div>
+      <div class="wbs-category-grid">${catCards}</div>
+    </div>`;
+}
+
+function renderWbsAlertCard(label, items, type, icon) {
+  const rows = items.length === 0
+    ? '<div class="alert-empty">問題なし ✓</div>'
+    : items.slice(0, 8).map(t => `
+        <div class="alert-row">
+          <span class="badge ${staffClass(t.assignee)}">${esc(t.assignee || '未担当')}</span>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title)}</span>
+          ${t.importance && t.importance !== '通常' ? `<span style="font-size:11px;color:#d97706">${esc(t.importance)}</span>` : ''}
+          ${t.due ? `<span style="font-size:11px;color:#94a3b8">${esc(t.due)}</span>` : ''}
+        </div>`).join('');
+  return `
+    <div class="alert-card">
+      <div class="alert-header ${type}">
+        <span>${icon} ${label}</span>
+        <span class="count">${items.length}</span>
+      </div>
+      <div class="alert-list">${rows}</div>
+    </div>`;
 }
 
 // ─── Init ──────────────────────────────────────────────────
