@@ -144,16 +144,17 @@ async def poll_chatwork():
                     })
                 else:
                     # [rp] 引用がある場合のみ参照先メッセージIDでタスクを特定
-                    # ※ [rp]のない無関係なメッセージ（Lステップ自動通知など）は紐付けない
-                    # ※ CS_HUBくんが一度も返信していないタスクへのスレッド追加も除外
-                    #   →「自分が返信した会話の続き」のみ追跡する
                     ref_mid = cw.parse_reply_reference(body)
                     target_task = db.find_task_by_message_id(ref_mid, room_id) if ref_mid else None
+                    is_reply_to_us = cw.is_reply_to_hub(body, HUB_ACCOUNT_ID)
 
                     if target_task:
+                        # 既存タスクへのスレッド追加
+                        # ・CS_HUBへの返信元 → 常に追跡
+                        # ・それ以外 → 自分が返信済みの会話のみ追跡
                         threads = db.get_threads(target_task["id"])
                         has_our_reply = any(t["direction"] == "outbound" for t in threads)
-                        if has_our_reply:
+                        if has_our_reply or is_reply_to_us:
                             db.add_thread(target_task["id"], {
                                 "chatwork_message_id": str(m["message_id"]),
                                 "sender_name": m.get("account", {}).get("name", ""),
@@ -162,6 +163,29 @@ async def poll_chatwork():
                                 "direction": "inbound",
                             })
                             db.update_task(target_task["id"], {})
+                    elif is_reply_to_us:
+                        # CS_HUBへの返信元だが既存タスクなし → 新規タスク作成
+                        clean = cw.clean_body(body)
+                        summary = await generate_summary(clean)
+                        db.mark_message_processed(mid)
+                        task_id = db.create_task({
+                            "title": summary,
+                            "body": clean,
+                            "summary": summary,
+                            "assignee": DEFAULT_ASSIGNEE or None,
+                            "chatwork_room_id": room_id,
+                            "chatwork_room_name": room_name,
+                            "chatwork_message_id": str(m["message_id"]),
+                            "sender_name": m.get("account", {}).get("name", ""),
+                            "sender_account_id": str(m.get("account", {}).get("account_id", "")),
+                        })
+                        db.add_thread(task_id, {
+                            "chatwork_message_id": str(m["message_id"]),
+                            "sender_name": m.get("account", {}).get("name", ""),
+                            "sender_account_id": str(m.get("account", {}).get("account_id", "")),
+                            "body": clean,
+                            "direction": "inbound",
+                        })
 
             max_id = str(max(int(str(m["message_id"])) for m in new_messages))
             db.set_last_message_id(room_id, max_id)

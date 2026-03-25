@@ -67,6 +67,11 @@ def is_relevant_message(body: str, hub_account_id: str, has_our_reply: bool = Fa
     """
     return parse_mentions(body, hub_account_id) or has_our_reply
 
+def is_reply_to_hub(body: str, hub_account_id: str) -> bool:
+    """メッセージにCS_HUBくんへの返信元（[rp aid=HUB_ID ...]）が含まれるか判定"""
+    return bool(re.search(rf'\[rp\s+aid={re.escape(hub_account_id)}\s+to=\d+-\d+\]', body))
+
+
 def parse_reply_reference(body: str) -> Optional[str]:
     """[rp aid=X to=ROOM-MESSAGE_ID] から参照先メッセージIDを取得"""
     m = re.search(r'\[rp\s+aid=\d+\s+to=\d+-(\d+)\]', body)
@@ -76,6 +81,7 @@ def parse_reply_reference(body: str) -> Optional[str]:
 def clean_body(body: str) -> str:
     """Chatworkの記法を除去してプレーンテキスト化"""
     body = re.sub(r"\[To:\d+\][^\n]*", "", body)  # [To:12345]名前 を行ごと除去
+    body = re.sub(r"\[rp\s+aid=\d+\s+to=\d+-\d+\][^\n]*", "", body)  # [rp ...] を行ごと除去
     body = re.sub(r"\[info\]|\[\/info\]|\[title\]|\[\/title\]", "", body)
     body = re.sub(r"\[code\]|\[\/code\]", "", body)
     return body.strip()
