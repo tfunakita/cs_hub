@@ -105,21 +105,24 @@ async def poll_chatwork():
                 continue
 
             last_id = db.get_last_message_id(room_id)
-            new_messages = []
+
+            # last_message_id を全メッセージの最大値で更新
+            all_max_id = str(max(int(str(m["message_id"])) for m in messages))
+
             for m in messages:
-                mid = str(m["message_id"])
-                if last_id is None or int(mid) > int(last_id):
-                    new_messages.append(m)
-
-            if not new_messages:
-                continue
-
-            for m in new_messages:
                 mid = str(m["message_id"])
                 if db.is_message_processed(mid):
                     continue
                 body = m.get("body", "")
-                if cw.parse_mentions(body, HUB_ACCOUNT_ID):
+                is_new = last_id is None or int(mid) > int(last_id)
+                is_mention = cw.parse_mentions(body, HUB_ACCOUNT_ID)
+                is_reply_to_us = cw.is_reply_to_hub(body, HUB_ACCOUNT_ID)
+
+                # 新しいメッセージ or CS_HUBへのメンション/返信元のみ処理
+                if not is_new and not is_mention and not is_reply_to_us:
+                    continue
+
+                if is_mention:
                     clean = cw.clean_body(body)
                     summary = await generate_summary(clean)
                     db.mark_message_processed(mid)
@@ -134,7 +137,6 @@ async def poll_chatwork():
                         "sender_name": m.get("account", {}).get("name", ""),
                         "sender_account_id": str(m.get("account", {}).get("account_id", "")),
                     })
-                    # スレッドの初期メッセージとして保存
                     db.add_thread(task_id, {
                         "chatwork_message_id": str(m["message_id"]),
                         "sender_name": m.get("account", {}).get("name", ""),
@@ -146,7 +148,6 @@ async def poll_chatwork():
                     # [rp] 引用がある場合のみ参照先メッセージIDでタスクを特定
                     ref_mid = cw.parse_reply_reference(body)
                     target_task = db.find_task_by_message_id(ref_mid, room_id) if ref_mid else None
-                    is_reply_to_us = cw.is_reply_to_hub(body, HUB_ACCOUNT_ID)
 
                     if target_task:
                         # 既存タスクへのスレッド追加
@@ -187,8 +188,7 @@ async def poll_chatwork():
                             "direction": "inbound",
                         })
 
-            max_id = str(max(int(str(m["message_id"])) for m in new_messages))
-            db.set_last_message_id(room_id, max_id)
+            db.set_last_message_id(room_id, all_max_id)
         except Exception as e:
             print(f"[poll] room {room_id} error: {e}")
 
