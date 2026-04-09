@@ -928,7 +928,27 @@ function renderChatworkMarkup(text) {
 function onFileSelected(input) {
   const previewArea = document.getElementById('attach-preview-area');
   const infoEl = document.getElementById('attach-info');
-  if (!input.files || input.files.length === 0) {
+  if (!input.files || input.files.length === 0) return;
+  // Merge new files with existing ones
+  const dt = new DataTransfer();
+  const existingFiles = input._mergedFiles || [];
+  existingFiles.forEach(f => dt.items.add(f));
+  for (let i = 0; i < input.files.length; i++) {
+    const newFile = input.files[i];
+    const isDuplicate = existingFiles.some(f => f.name === newFile.name && f.size === newFile.size);
+    if (!isDuplicate) dt.items.add(newFile);
+  }
+  input._mergedFiles = Array.from(dt.files);
+  input.files = dt.files;
+  refreshAttachUI();
+}
+
+function refreshAttachUI() {
+  const fileInput = document.getElementById('reply-file');
+  const previewArea = document.getElementById('attach-preview-area');
+  const infoEl = document.getElementById('attach-info');
+  const files = fileInput._mergedFiles || [];
+  if (files.length === 0) {
     previewArea.style.display = 'none';
     previewArea.innerHTML = '';
     infoEl.style.display = 'none';
@@ -936,8 +956,8 @@ function onFileSelected(input) {
   }
   // Build info tags for each file
   let infoHtml = '';
-  for (let i = 0; i < input.files.length; i++) {
-    const file = input.files[i];
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
     infoHtml += `<span class="attach-info">${esc(file.name)} (${formatFileSize(file.size)})<button class="remove-attach" onclick="removeFileAt(${i})" title="削除">✕</button></span>`;
   }
   infoEl.innerHTML = infoHtml;
@@ -945,8 +965,8 @@ function onFileSelected(input) {
   // Build image previews
   previewArea.innerHTML = '';
   let hasPreview = false;
-  for (let i = 0; i < input.files.length; i++) {
-    const file = input.files[i];
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
     if (file.type.startsWith('image/')) {
       hasPreview = true;
       const reader = new FileReader();
@@ -964,17 +984,18 @@ function onFileSelected(input) {
 
 function removeFileAt(index) {
   const fileInput = document.getElementById('reply-file');
+  const merged = fileInput._mergedFiles || [];
+  merged.splice(index, 1);
+  fileInput._mergedFiles = merged;
   const dt = new DataTransfer();
-  for (let i = 0; i < fileInput.files.length; i++) {
-    if (i !== index) dt.items.add(fileInput.files[i]);
-  }
+  merged.forEach(f => dt.items.add(f));
   fileInput.files = dt.files;
-  onFileSelected(fileInput);
+  refreshAttachUI();
 }
 
 function clearAttachment() {
   const fileInput = document.getElementById('reply-file');
-  if (fileInput) fileInput.value = '';
+  if (fileInput) { fileInput.value = ''; fileInput._mergedFiles = []; }
   const previewArea = document.getElementById('attach-preview-area');
   if (previewArea) { previewArea.style.display = 'none'; previewArea.innerHTML = ''; }
   const infoEl = document.getElementById('attach-info');
