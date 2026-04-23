@@ -209,6 +209,12 @@ a, button, input, select, textarea, .badge, .kpi-card, .alert-card, .kanban-card
 .to-tag button:hover { color: #dc2626; }
 .to-add-btn { display: inline-flex; align-items: center; gap: 3px; padding: 4px 10px; border-radius: 12px; border: 1px dashed #93c5fd; background: transparent; color: #3b82f6; cursor: pointer; font-size: 12px; font-family: inherit; transition: all 0.2s; }
 .to-add-btn:hover { background: #eff6ff; border-style: solid; }
+.to-all-btn { display: inline-flex; align-items: center; gap: 3px; padding: 4px 10px; border-radius: 12px; border: 1px solid #f59e0b; background: transparent; color: #d97706; cursor: pointer; font-size: 12px; font-weight: 600; font-family: inherit; transition: all 0.2s; }
+.to-all-btn:hover { background: #fffbeb; }
+.to-all-btn.active { background: #fef3c7; border-color: #d97706; color: #92400e; }
+.to-all-tag { display: inline-flex; align-items: center; gap: 4px; background: #fef3c7; color: #92400e; padding: 3px 8px; border-radius: 12px; font-size: 12px; font-weight: 700; }
+.to-all-tag button { background: none; border: none; color: #d97706; cursor: pointer; font-size: 13px; padding: 0 1px; line-height: 1; }
+.to-all-tag button:hover { color: #dc2626; }
 .to-dropdown { position: absolute; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 4px 0; z-index: 300; max-height: 200px; overflow-y: auto; min-width: 180px; }
 .to-dropdown-item { padding: 8px 14px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
 .to-dropdown-item:hover { background: #eff6ff; }
@@ -272,6 +278,7 @@ a, button, input, select, textarea, .badge, .kpi-card, .alert-card, .kanban-card
   <h1>💬 CS_HUBくん</h1>
   <button class="header-btn" id="btn-poll" onclick="manualPoll()">🔄 今すぐ取得</button>
   <button class="header-btn" onclick="openNewTask()">＋ 新規タスク</button>
+  <button class="header-btn" onclick="openNewMessage()">✉ 新規メッセージ</button>
 </div>
 
 <div class="nav">
@@ -591,6 +598,10 @@ function renderBulkBar() {
 // ─── Task Modal ────────────────────────────────────────────
 async function openTask(taskId) {
   state.editingId = taskId;
+  selectedTos = [];
+  toAll = false;
+  previewEnabled = false;
+  activeTextareaId = 'reply-input';
   const [task, threads] = await Promise.all([
     api.get(`/api/tasks/${taskId}`),
     api.get(`/api/tasks/${taskId}/threads`),
@@ -666,6 +677,7 @@ function renderTaskModalBody(task, threads) {
             <span style="font-size:12px;font-weight:600;color:#64748b">TO:</span>
             <span id="to-tags"></span>
             <button class="to-add-btn" onclick="toggleToDropdown('${task.chatwork_room_id}')">＋ 追加</button>
+            <button class="to-all-btn" onclick="toggleToAll()">ALL</button>
             <div class="to-dropdown" id="to-dropdown" style="display:none"></div>
           </div>
           <textarea id="reply-input" placeholder="返信を入力（Chatworkにも送信）… Cmd+Enterで送信" oninput="updatePreview()" onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter'){event.preventDefault();sendReply(${task.id});}"></textarea>
@@ -802,6 +814,7 @@ function renderThreadMsg(m) {
 
 // ─── TO Mention ────────────────────────────────────────────
 let selectedTos = []; // [{account_id, name}, ...]
+let toAll = false;
 let roomMembersCache = {};
 
 async function toggleToDropdown(roomId) {
@@ -835,7 +848,15 @@ function closeToDropdownOnClick(e) {
   if (dd && !dd.contains(e.target)) dd.style.display = 'none';
 }
 
+function toggleToAll() {
+  toAll = !toAll;
+  if (toAll) selectedTos = [];
+  renderToTags();
+  updatePreview();
+}
+
 function addTo(accountId, name) {
+  if (toAll) return;
   if (selectedTos.some(t => String(t.account_id) === String(accountId))) return;
   selectedTos.push({account_id: accountId, name});
   renderToTags();
@@ -852,12 +873,22 @@ function removeTo(accountId) {
 function renderToTags() {
   const el = document.getElementById('to-tags');
   if (!el) return;
-  el.innerHTML = selectedTos.map(t =>
-    `<span class="to-tag">${esc(t.name)}<button onclick="removeTo('${t.account_id}')">✕</button></span>`
-  ).join('');
+  if (toAll) {
+    el.innerHTML = '<span class="to-all-tag">ALL<button onclick="toggleToAll()">✕</button></span>';
+  } else {
+    el.innerHTML = selectedTos.map(t =>
+      `<span class="to-tag">${esc(t.name)}<button onclick="removeTo('${t.account_id}')">✕</button></span>`
+    ).join('');
+  }
+  // TO ALL状態に応じて追加ボタンの表示切り替え
+  const addBtn = document.querySelector('.to-add-btn');
+  if (addBtn) addBtn.style.display = toAll ? 'none' : '';
+  const allBtn = document.querySelector('.to-all-btn');
+  if (allBtn) allBtn.classList.toggle('active', toAll);
 }
 
 function buildToPrefix() {
+  if (toAll) return '[toall]\n';
   return selectedTos.map(t => `[To:${t.account_id}] ${t.name}さん`).join('\n') + (selectedTos.length ? '\n' : '');
 }
 
@@ -875,12 +906,15 @@ function togglePreview() {
   }
 }
 
+let activeTextareaId = 'reply-input';
+
 function updatePreview() {
   if (!previewEnabled) return;
   const area = document.getElementById('cw-preview-content');
   if (!area) return;
-  const text = document.getElementById('reply-input').value;
-  if (!text.trim() && selectedTos.length === 0) {
+  const textarea = document.getElementById(activeTextareaId);
+  const text = textarea ? textarea.value : '';
+  if (!text.trim() && selectedTos.length === 0 && !toAll) {
     area.innerHTML = '<span class="cw-preview-empty" style="padding:16px;display:block;text-align:center">メッセージを入力するとプレビューが表示されます</span>';
     return;
   }
@@ -909,6 +943,9 @@ function renderChatworkMarkup(text) {
     '<div class="cw-code">$1</div>');
   // [hr]
   html = html.replace(/\[hr\]/g, '<hr class="cw-hr">');
+  // [toall]
+  html = html.replace(/\[toall\]/g,
+    '<span class="cw-mention">TO ALL</span>');
   // [To:12345] 名前さん
   html = html.replace(/\[To:\d+\]\s*([^\n]*)/g,
     '<span class="cw-mention">To $1</span>');
@@ -1031,6 +1068,7 @@ async function sendReply(taskId) {
     document.getElementById('thread-list').innerHTML = threads.map(m => renderThreadMsg(m)).join('');
     document.getElementById('reply-input').value = '';
     selectedTos = [];
+    toAll = false;
     renderToTags();
     clearAttachment();
     updatePreview();
@@ -1423,9 +1461,127 @@ function debounceSearch(val) {
   searchTimer = setTimeout(() => { state.filters.search = val; renderTasks(); }, 300);
 }
 
+// ─── New Message ───────────────────────────────────────────
+let newMsgRooms = [];
+
+async function openNewMessage() {
+  state.editingId = null;
+  selectedTos = [];
+  toAll = false;
+  previewEnabled = false;
+  activeTextareaId = 'new-msg-input';
+  document.getElementById('modal-title').textContent = '✉ 新規メッセージ';
+  document.getElementById('modal-body').innerHTML = `
+    <div class="field">
+      <label>送信先ルーム <span style="color:#dc2626">*</span></label>
+      <select id="new-msg-room" onchange="onNewMsgRoomChange(this.value)" style="width:100%">
+        <option value="">読み込み中...</option>
+      </select>
+    </div>
+    <div class="to-selector" id="to-selector" style="position:relative;display:none">
+      <span style="font-size:12px;font-weight:600;color:#64748b">TO:</span>
+      <span id="to-tags"></span>
+      <button class="to-add-btn" id="new-msg-to-btn" onclick="toggleToDropdown(document.getElementById('new-msg-room').value)">＋ 追加</button>
+      <button class="to-all-btn" onclick="toggleToAll()">ALL</button>
+      <div class="to-dropdown" id="to-dropdown" style="display:none"></div>
+    </div>
+    <div class="field">
+      <label>メッセージ <span style="color:#dc2626">*</span></label>
+      <textarea id="new-msg-input" rows="6" placeholder="メッセージを入力… Cmd+Enterで送信" oninput="updatePreview()" onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter'){event.preventDefault();sendNewMessage();}"></textarea>
+    </div>
+    <div id="cw-preview-area" style="display:none">
+      <div style="font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px">Chatwork送信イメージ</div>
+      <div class="cw-preview-wrap" id="cw-preview-content"></div>
+    </div>
+    <div id="attach-preview-area" style="display:none"></div>
+    <div class="reply-actions">
+      <input type="file" id="reply-file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip" style="display:none" onchange="onFileSelected(this)">
+      <button class="attach-btn" onclick="document.getElementById('reply-file').click()">📎 ファイル添付</button>
+      <span id="attach-info" style="display:none"></span>
+      <button class="preview-toggle" id="preview-toggle-btn" onclick="togglePreview()">👁 プレビュー</button>
+    </div>`;
+  document.getElementById('modal-footer').innerHTML = `
+    <div class="ml-auto" style="display:flex;gap:8px">
+      <button class="btn btn-slate" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" id="btn-send-new-msg" onclick="sendNewMessage()">✉ 送信</button>
+    </div>`;
+  document.getElementById('task-overlay').classList.add('open');
+
+  // ルーム一覧を取得
+  try {
+    newMsgRooms = await api.get('/api/chatwork/rooms');
+    const groupRooms = newMsgRooms.filter(r => r.type === 'group');
+    const sel = document.getElementById('new-msg-room');
+    sel.innerHTML = '<option value="">ルームを選択してください</option>' +
+      groupRooms.map(r => `<option value="${r.room_id}">${esc(r.name)}</option>`).join('');
+  } catch(e) {
+    document.getElementById('new-msg-room').innerHTML = '<option value="">ルーム取得失敗</option>';
+  }
+}
+
+function onNewMsgRoomChange(roomId) {
+  selectedTos = [];
+  toAll = false;
+  renderToTags();
+  const toSelector = document.getElementById('to-selector');
+  if (roomId) {
+    toSelector.style.display = 'flex';
+  } else {
+    toSelector.style.display = 'none';
+  }
+  updatePreview();
+}
+
+async function sendNewMessage() {
+  const roomId = document.getElementById('new-msg-room').value;
+  if (!roomId) { alert('送信先ルームを選択してください'); return; }
+  const rawBody = document.getElementById('new-msg-input').value.trim();
+  const fileInput = document.getElementById('reply-file');
+  const hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
+  if (!rawBody && !hasFile) { alert('メッセージを入力してください'); return; }
+
+  const toPrefix = buildToPrefix();
+  const body = toPrefix + rawBody;
+
+  const btn = document.getElementById('btn-send-new-msg');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> 送信中...';
+
+  try {
+    if (hasFile) {
+      const formData = new FormData();
+      formData.append('room_id', roomId);
+      formData.append('body', body);
+      for (let i = 0; i < fileInput.files.length; i++) {
+        formData.append('files', fileInput.files[i]);
+      }
+      const r = await fetch('/api/chatwork/messages/file', { method: 'POST', body: formData });
+      if (!r.ok) throw new Error(await r.text());
+    } else {
+      await api.post('/api/chatwork/messages', { room_id: roomId, body });
+    }
+    closeModal();
+    // 成功通知（一時的なトースト）
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.15);animation:modal-slide-up .3s ease';
+    toast.textContent = '✅ メッセージを送信しました';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  } catch(e) {
+    alert('送信失敗: ' + e.message);
+    btn.disabled = false;
+    btn.innerHTML = '✉ 送信';
+  }
+}
+
 // ─── Modal utils ───────────────────────────────────────────
 function closeModal() {
   document.getElementById('task-overlay').classList.remove('open');
+  activeTextareaId = 'reply-input';
+  previewEnabled = false;
+  selectedTos = [];
+  toAll = false;
+  clearAttachment();
 }
 
 function maybeCloseModal(e) {
